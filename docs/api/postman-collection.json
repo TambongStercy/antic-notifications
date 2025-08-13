@@ -1,0 +1,372 @@
+{
+    "info": {
+        "name": "Antic Notification Service API",
+        "description": "Complete API collection for the notification service",
+        "version": "1.0.0",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3000",
+            "type": "string"
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Admin Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('access_token', response.accessToken);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "login"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Health Check",
+            "item": [
+                {
+                    "name": "Get Health Status",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/api/health",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "health"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notifications",
+            "item": [
+                {
+                    "name": "Send WhatsApp Message",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"recipient\": \"+237123456789\",\n  \"message\": \"Hello from WhatsApp API! 📱\",\n  \"metadata\": {\n    \"source\": \"postman\",\n    \"campaign\": \"test\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/notifications/whatsapp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "notifications",
+                                "whatsapp"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Send Telegram Message",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"recipient\": \"@username\",\n  \"message\": \"Hello from Telegram API! 🚀\",\n  \"metadata\": {\n    \"source\": \"postman\",\n    \"campaign\": \"test\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/notifications/telegram",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "notifications",
+                                "telegram"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Admin Operations",
+            "auth": {
+                "type": "bearer",
+                "bearer": [
+                    {
+                        "key": "token",
+                        "value": "{{access_token}}",
+                        "type": "string"
+                    }
+                ]
+            },
+            "item": [
+                {
+                    "name": "Get Service Status",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "status"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get WhatsApp QR Code",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/qr",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "qr"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Set Telegram Bot Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"botToken\": \"123456789:ABCdefGhIJKlmNOPQRSTUVWXYZabcdefghi\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/telegram/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "telegram",
+                                "token"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Connect Telegram",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/telegram/connect",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "telegram",
+                                "connect"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Connect WhatsApp",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/whatsapp/connect",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "whatsapp",
+                                "connect"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Disconnect WhatsApp",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/whatsapp/disconnect",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "whatsapp",
+                                "disconnect"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Messages",
+            "auth": {
+                "type": "bearer",
+                "bearer": [
+                    {
+                        "key": "token",
+                        "value": "{{access_token}}",
+                        "type": "string"
+                    }
+                ]
+            },
+            "item": [
+                {
+                    "name": "Get Messages",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/api/messages?page=1&limit=20&service=whatsapp&status=sent",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "messages"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                },
+                                {
+                                    "key": "service",
+                                    "value": "whatsapp"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "sent"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Message Statistics",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/api/messages/stats",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "messages",
+                                "stats"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Retry Failed Message",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/api/messages/507f1f77bcf86cd799439011/retry",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "messages",
+                                "507f1f77bcf86cd799439011",
+                                "retry"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}
