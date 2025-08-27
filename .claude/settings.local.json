@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.mattermost.com)",
+      "WebFetch(domain:developers.mattermost.com)",
+      "WebFetch(domain:api.mattermost.com)",
+      "WebSearch",
+      "Bash(sed:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

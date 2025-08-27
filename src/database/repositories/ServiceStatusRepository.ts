@@ -109,7 +109,7 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
   async setWhatsAppQRCode(qrCode: string): Promise<IServiceStatus> {
     try {
       return await this.updateServiceStatus('whatsapp', {
-        status: 'authenticating',
+        status: 'disconnected', // Keep as disconnected until actually connected
         metadata: { qrCode },
       });
     } catch (error) {
@@ -286,19 +286,6 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
     }
   }
 
-  /**
-   * Mark service as authenticating
-   */
-  async markAsAuthenticating(service: ServiceType): Promise<IServiceStatus> {
-    try {
-      return await this.updateServiceStatus(service, {
-        status: 'authenticating',
-      });
-    } catch (error) {
-      logger.error(`Error marking ${service} as authenticating:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Check if service is connected
@@ -313,41 +300,7 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
     }
   }
 
-  /**
-   * Check if service is authenticating
-   */
-  async isServiceAuthenticating(service: ServiceType): Promise<boolean> {
-    try {
-      const status = await this.findByService(service);
-      return status?.status === 'authenticating';
-    } catch (error) {
-      logger.error(`Error checking if ${service} is authenticating:`, error);
-      return false;
-    }
-  }
 
-  /**
-   * Get service health status for health check endpoint
-   */
-  async getServiceHealthStatus(): Promise<Record<ServiceType, ConnectionStatus | 'not_configured'>> {
-    try {
-      const statuses = await this.getAllStatuses();
-
-      const healthStatus: Record<ServiceType, ConnectionStatus | 'not_configured'> = {
-        whatsapp: 'not_configured',
-        telegram: 'not_configured',
-      };
-
-      statuses.forEach(status => {
-        healthStatus[status.service] = status.status;
-      });
-
-      return healthStatus;
-    } catch (error) {
-      logger.error('Error getting service health status:', error);
-      throw error;
-    }
-  }
 
   /**
    * Clear all sensitive data for a service
@@ -376,7 +329,7 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
    */
   async initializeDefaultStatuses(): Promise<void> {
     try {
-      const services: ServiceType[] = ['whatsapp', 'telegram'];
+      const services: ServiceType[] = ['whatsapp', 'telegram', 'mattermost'];
 
       for (const service of services) {
         const exists = await this.exists({ service });
@@ -405,7 +358,7 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
     try {
       return await this.find(
         {
-          status: { $in: ['disconnected', 'authenticating'] },
+          status: { $in: ['disconnected'] },
         },
         {
           sort: { lastUpdated: -1 },
@@ -413,6 +366,89 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
       );
     } catch (error) {
       logger.error('Error getting services needing attention:', error);
+      throw error;
+    }
+  }
+
+
+  /**
+   * Get service health status for health check endpoint
+   */
+  async getServiceHealthStatus(): Promise<Record<ServiceType, ConnectionStatus | 'not_configured'>> {
+    try {
+      const statuses = await this.getAllStatuses();
+
+      const healthStatus: Record<ServiceType, ConnectionStatus | 'not_configured'> = {
+        whatsapp: 'not_configured',
+        telegram: 'not_configured',
+        mattermost: 'not_configured',
+      };
+
+      statuses.forEach(status => {
+        healthStatus[status.service] = status.status;
+      });
+
+      return healthStatus;
+    } catch (error) {
+      logger.error('Error getting service health status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set Mattermost configuration
+   */
+  async setMattermostConfig(serverUrl: string, accessToken: string): Promise<IServiceStatus> {
+    try {
+      return await this.updateServiceStatus('mattermost', {
+        status: 'disconnected',
+        metadata: { serverUrl, accessToken },
+      });
+    } catch (error) {
+      logger.error('Error setting Mattermost configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Mattermost configuration (includes sensitive data)
+   */
+  async getMattermostConfig(): Promise<{ serverUrl?: string; accessToken?: string } | null> {
+    try {
+      const status = await ServiceStatus.findOne({ service: 'mattermost' })
+        .select('+metadata.serverUrl +metadata.accessToken')
+        .exec();
+
+      return {
+        serverUrl: status?.metadata?.serverUrl || undefined,
+        accessToken: status?.metadata?.accessToken || undefined,
+      };
+    } catch (error) {
+      logger.error('Error getting Mattermost configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear Mattermost configuration
+   */
+  async clearMattermostConfig(): Promise<IServiceStatus | null> {
+    try {
+      return await ServiceStatus.findOneAndUpdate(
+        { service: 'mattermost' },
+        {
+          $unset: {
+            'metadata.serverUrl': 1,
+            'metadata.accessToken': 1,
+            'metadata.webhookUrl': 1,
+          },
+          status: 'disconnected',
+          lastUpdated: new Date(),
+        },
+        { new: true }
+      );
+    } catch (error) {
+      logger.error('Error clearing Mattermost configuration:', error);
       throw error;
     }
   }

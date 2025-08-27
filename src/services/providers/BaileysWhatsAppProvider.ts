@@ -1,19 +1,15 @@
-import { EventEmitter } from 'events';
 import makeWASocket, {
-    DisconnectReason,
     useMultiFileAuthState,
     WASocket,
-    ConnectionState,
-    AuthenticationState,
-    SignalDataTypeMap
+    AuthenticationState
 } from '@whiskeysockets/baileys';
-import { Boom } from '@hapi/boom';
 import QRCode from 'qrcode';
 import { ServiceStatusRepository } from '@/database/repositories/ServiceStatusRepository';
 import { MessageRepository } from '@/database/repositories/MessageRepository';
 import { ServiceType } from '@/types';
 import { config } from '@/config/environment';
 import logger from '@/utils/logger';
+import { validateWhatsAppPhoneNumber, formatWhatsAppJID } from '@/utils/phoneNumber';
 
 export interface SendResult {
     success: boolean;
@@ -21,26 +17,14 @@ export interface SendResult {
     errorMessage?: string;
 }
 
-export interface BaileysWhatsAppProviderEvents {
-    on(event: 'qr', listener: (qr: string) => void): this;
-    on(event: 'ready', listener: () => void): this;
-    on(event: 'authenticated', listener: () => void): this;
-    on(event: 'disconnected', listener: (reason?: string) => void): this;
-    on(event: 'stream-error', listener: (reason: string) => void): this;
-    on(event: 'connecting', listener: () => void): this;
-    on(event: 'reconnection-loop', listener: (attempts: number) => void): this;
-}
-
-export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmitter & BaileysWhatsAppProviderEvents }) {
+export class BaileysWhatsAppProvider {
     private statusRepository: ServiceStatusRepository;
     private messageRepository: MessageRepository;
     private socket: WASocket | null = null;
     private initialized = false;
     private connected = false;
     private authState: AuthenticationState | null = null;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 3;
-    private lastDisconnectTime = 0;
+    private pollingInterval: NodeJS.Timeout | null = null;
 
     constructor(
         deps?: {
@@ -48,7 +32,6 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
             messageRepository?: MessageRepository;
         }
     ) {
-        super();
         this.statusRepository = deps?.statusRepository ?? new ServiceStatusRepository();
         this.messageRepository = deps?.messageRepository ?? new MessageRepository();
     }
@@ -57,12 +40,6 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
         if (this.initialized && this.socket && this.connected) {
             logger.info('Baileys WhatsApp client already initialized and connected');
             return;
-        }
-
-        // If initialized but not connected, allow re-initialization
-        if (this.initialized && this.socket && !this.connected) {
-            logger.info('Baileys WhatsApp client initialized but not connected, reinitializing...');
-            this.initialized = false;
         }
 
         // Clean up any existing socket first
@@ -75,11 +52,16 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
             this.socket = null;
         }
 
-        this.initialized = true;
-
         try {
             logger.info('Creating new Baileys WhatsApp client instance');
             logger.info('Session path:', config.whatsapp.sessionPath);
+
+            // Ensure session directory exists before creating auth state
+            const fs = require('fs');
+            if (!fs.existsSync(config.whatsapp.sessionPath)) {
+                fs.mkdirSync(config.whatsapp.sessionPath, { recursive: true });
+                logger.info('Created session directory:', config.whatsapp.sessionPath);
+            }
 
             // Use multi-file auth state for session management
             const { state, saveCreds } = await useMultiFileAuthState(config.whatsapp.sessionPath);
@@ -87,15 +69,15 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
 
             logger.info('Auth state loaded, creds available:', !!state.creds);
 
-            // Create the socket with better configuration
+            // Create the socket with minimal configuration
             this.socket = makeWASocket({
                 auth: state,
-                printQRInTerminal: false, // We'll handle QR ourselves
-                connectTimeoutMs: 60000, // 60 seconds timeout
-                defaultQueryTimeoutMs: 60000, // 60 seconds query timeout
-                keepAliveIntervalMs: 10000, // 10 seconds keep alive
+                printQRInTerminal: false,
+                connectTimeoutMs: 60000,
+                defaultQueryTimeoutMs: 60000,
+                qrTimeout: 40000,
                 logger: {
-                    level: 'error', // Reduce Baileys logging
+                    level: 'error',
                     child: () => ({
                         level: 'error',
                         trace: () => { },
@@ -110,29 +92,29 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
                     warn: () => { },
                     error: (msg: any) => logger.error('Baileys:', msg),
                 },
-                // Add retry configuration
                 retryRequestDelayMs: 250,
                 maxMsgRetryCount: 5,
+                getMessage: async () => undefined,
+                syncFullHistory: false,
+                markOnlineOnConnect: false,
+                browser: ['WhatsApp Web', 'Chrome', '4.0.0'],
+                mobile: false,
+                emitOwnEvents: true,
+                fireInitQueries: true,
+                generateHighQualityLinkPreview: false,
             });
 
-            this.setupEventHandlers(saveCreds);
+            // Set up basic event handlers for QR and connection status
+            this.setupBasicEventHandlers(saveCreds);
 
-            // Force connection start if not already connected
-            if (!this.connected) {
-                logger.info('Starting Baileys WhatsApp connection...');
-                // The socket should automatically start connecting, but let's ensure it
-                setTimeout(() => {
-                    if (!this.connected && this.socket) {
-                        logger.info('Connection not established yet, socket exists:', !!this.socket);
-                    }
-                }, 5000);
-            }
-
+            this.initialized = true;
             logger.info('Baileys WhatsApp client initialized successfully');
+
+            // Start polling for connection status
+            this.startPolling();
+
         } catch (error) {
             logger.error('Failed to initialize Baileys WhatsApp client:', error);
-
-            // Clean up on failure
             this.initialized = false;
             if (this.socket) {
                 try {
@@ -142,176 +124,98 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
                 }
                 this.socket = null;
             }
-
             await this.statusRepository.markAsDisconnected('whatsapp');
             throw error;
         }
     }
 
-    private setupEventHandlers(saveCreds: () => Promise<void>): void {
+    private setupBasicEventHandlers(saveCreds: () => Promise<void>): void {
         if (!this.socket) return;
 
-        // Handle connection updates
+        // Handle QR code generation
         this.socket.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            logger.info('Baileys connection update', {
-                connection,
-                hasQR: !!qr,
-                hasLastDisconnect: !!lastDisconnect
-            });
-
-            // Emit connection state changes
-            if (connection === 'connecting') {
-                logger.info('WhatsApp is connecting...');
-                this.emit('connecting');
-            } else if (connection === 'open') {
-                logger.info('WhatsApp connection opened');
-            }
-
+            const { qr } = update;
             if (qr) {
                 try {
-                    // Generate QR code and store it
                     const qrString = await QRCode.toString(qr, { type: 'terminal' });
-                    await this.statusRepository.setWhatsAppQRCode(qr);
-                    this.emit('qr', qr);
-                    logger.info('WhatsApp QR code generated and stored', {
-                        length: qr.length,
-                        timestamp: new Date().toISOString()
-                    });
+                    await this.statusRepository.setWhatsAppQRCode(qrString);
+                    logger.info('WhatsApp QR code generated and stored');
                 } catch (error) {
                     logger.error('Failed to generate QR code:', error);
                 }
             }
-
-            if (connection === 'close') {
-                const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
-                logger.info('WhatsApp connection closed', {
-                    shouldReconnect,
-                    statusCode,
-                    reason: lastDisconnect?.error?.message
-                });
-
-                this.connected = false;
-                await this.statusRepository.markAsDisconnected('whatsapp');
-                this.emit('disconnected', lastDisconnect?.error?.message);
-
-                // Handle specific error codes
-                if (statusCode === 515) {
-                    logger.warn('WhatsApp stream error 515 - clearing session and forcing fresh start');
-
-                    // Emit specific stream error event
-                    this.emit('stream-error', 'Stream Errored (restart required)');
-
-                    // Clear session files for fresh start
-                    try {
-                        const fs = require('fs');
-                        const sessionPath = config.whatsapp.sessionPath;
-                        if (fs.existsSync(sessionPath)) {
-                            fs.rmSync(sessionPath, { recursive: true, force: true });
-                            logger.info('Cleared session files due to stream error');
-                        }
-                    } catch (error) {
-                        logger.warn('Error clearing session files:', error);
-                    }
-
-                    // For stream errors, don't auto-reconnect - wait for manual intervention
-                    this.initialized = false;
-                    return;
-                }
-
-                // Handle other common error codes
-                if (statusCode === 401) {
-                    logger.warn('WhatsApp authentication failed - clearing session');
-                    try {
-                        const fs = require('fs');
-                        const sessionPath = config.whatsapp.sessionPath;
-                        if (fs.existsSync(sessionPath)) {
-                            fs.rmSync(sessionPath, { recursive: true, force: true });
-                            logger.info('Cleared session files due to auth failure');
-                        }
-                    } catch (error) {
-                        logger.warn('Error clearing session files:', error);
-                    }
-                    // Don't auto-reconnect on auth failures
-                    this.initialized = false;
-                    return;
-                }
-
-                // Check for rapid disconnections (within 30 seconds)
-                const now = Date.now();
-                const timeSinceLastDisconnect = now - this.lastDisconnectTime;
-                this.lastDisconnectTime = now;
-
-                if (timeSinceLastDisconnect < 30000) { // Less than 30 seconds
-                    this.reconnectAttempts++;
-                    logger.warn('Rapid disconnection detected', {
-                        attempts: this.reconnectAttempts,
-                        timeSinceLastDisconnect,
-                        statusCode
-                    });
-                } else {
-                    // Reset counter if enough time has passed
-                    this.reconnectAttempts = 0;
-                }
-
-                // Stop reconnecting if too many rapid attempts
-                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    logger.error('Too many rapid reconnection attempts - stopping auto-reconnect', {
-                        attempts: this.reconnectAttempts,
-                        maxAttempts: this.maxReconnectAttempts
-                    });
-                    this.initialized = false;
-                    this.emit('reconnection-loop', this.reconnectAttempts);
-                    this.reconnectAttempts = 0;
-                    return;
-                }
-
-                if (shouldReconnect) {
-                    const delay = Math.min(5000 * (this.reconnectAttempts + 1), 30000); // Exponential backoff, max 30s
-                    logger.info('Attempting to reconnect WhatsApp...', {
-                        statusCode,
-                        attempt: this.reconnectAttempts + 1,
-                        delay
-                    });
-
-                    // Reset initialization flag for fresh start
-                    this.initialized = false;
-                    setTimeout(() => this.init(), delay);
-                }
-            } else if (connection === 'open') {
-                logger.info('WhatsApp connection opened');
-                await this.statusRepository.clearWhatsAppQRCode();
-                logger.info('WhatsApp QR code cleared after successful connection');
-                await this.statusRepository.markAsConnected('whatsapp');
-                this.connected = true;
-
-                // Reset reconnect attempts on successful connection
-                this.reconnectAttempts = 0;
-
-                this.emit('authenticated');
-                this.emit('ready');
-            }
         });
 
         // Handle credentials update
-        this.socket.ev.on('creds.update', saveCreds);
-
-        // Handle messages (for future use)
-        this.socket.ev.on('messages.upsert', (m) => {
-            // Handle incoming messages if needed
-            logger.debug('Received messages:', m.messages.length);
+        this.socket.ev.on('creds.update', async () => {
+            try {
+                await saveCreds();
+                logger.debug('WhatsApp credentials updated');
+            } catch (error) {
+                logger.error('Error saving credentials:', error);
+            }
         });
+    }
+
+    private startPolling(): void {
+        // Stop any existing polling
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+
+        // Poll every 10 seconds to check connection status
+        this.pollingInterval = setInterval(async () => {
+            if (!this.socket || !this.initialized) return;
+
+            try {
+                // Simple health check - try to send a test message to ourselves
+                // If it succeeds, we're connected; if it fails, we're not
+                const testJid = `${this.socket.user?.id?.split(':')[0]}@s.whatsapp.net`;
+
+                if (testJid && testJid !== '@s.whatsapp.net') {
+                    try {
+                        // Try to get user info - if this fails, we're not connected
+                        await this.socket.sendMessage(testJid, { text: 'test' });
+                        if (!this.connected) {
+                            logger.info('WhatsApp connection established via polling');
+                            await this.statusRepository.clearWhatsAppQRCode();
+                            await this.statusRepository.markAsConnected('whatsapp');
+                            this.connected = true;
+                        }
+                    } catch (testError) {
+                        if (this.connected) {
+                            logger.info('WhatsApp connection lost via polling');
+                            await this.statusRepository.markAsDisconnected('whatsapp');
+                            this.connected = false;
+                        }
+                    }
+                }
+            } catch (error) {
+                logger.debug('WhatsApp polling health check failed:', error);
+                if (this.connected) {
+                    await this.statusRepository.markAsDisconnected('whatsapp');
+                    this.connected = false;
+                }
+            }
+        }, 10000); // Poll every 10 seconds
+    }
+
+    private stopPolling(): void {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
     }
 
     public async disconnect(): Promise<void> {
         try {
             logger.info('Starting Baileys WhatsApp disconnect process');
 
+            // Stop polling first
+            this.stopPolling();
+
             if (this.socket) {
-                // Baileys logout - this will trigger loggedOut disconnect reason
+                // Baileys logout
                 await this.socket.logout();
                 this.socket.end(undefined);
                 this.socket = null;
@@ -322,11 +226,9 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
             this.initialized = false;
             this.connected = false;
             this.authState = null;
-            this.reconnectAttempts = 0;
 
             await this.statusRepository.markAsDisconnected('whatsapp');
             await this.statusRepository.clearWhatsAppQRCode();
-            this.emit('disconnected');
             logger.info('Baileys WhatsApp provider disconnected successfully');
         } catch (error) {
             logger.error('Error during Baileys WhatsApp disconnect:', error);
@@ -339,7 +241,6 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
 
             await this.statusRepository.markAsDisconnected('whatsapp');
             await this.statusRepository.clearWhatsAppQRCode();
-            this.emit('disconnected');
         }
     }
 
@@ -348,51 +249,109 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
     }
 
     public async sendText(recipient: string, message: string, metadata?: Record<string, any>): Promise<SendResult> {
+        // Input validation
+        if (!recipient || typeof recipient !== 'string') {
+            return { success: false, errorMessage: 'Recipient phone number is required' };
+        }
+        
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return { success: false, errorMessage: 'Message content is required' };
+        }
+
+        // Validate phone number using utility function
+        const phoneValidation = validateWhatsAppPhoneNumber(recipient);
+        if (!phoneValidation.isValid) {
+            return { success: false, errorMessage: phoneValidation.error || 'Invalid phone number' };
+        }
+
         try {
+            // Store sanitized recipient in database
+            const sanitizedRecipient = phoneValidation.formatted || phoneValidation.cleanNumber;
             const msg = await this.messageRepository.create({
                 service: 'whatsapp' as ServiceType,
-                recipient,
-                message,
+                recipient: sanitizedRecipient,
+                message: message.trim(),
                 status: 'pending',
                 timestamp: new Date(),
                 metadata: metadata ?? {},
                 requestedBy: (metadata && (metadata as any).requestedBy) || (global as any).__requestedBy || 'admin',
             } as any);
 
+            // Connection validation
             if (!this.connected || !this.socket) {
-                await this.messageRepository.markAsFailed(msg.id, 'WhatsApp not connected');
-                return { success: false, errorMessage: 'WhatsApp not connected' };
+                await this.messageRepository.markAsFailed(msg.id, 'WhatsApp not connected. Please ensure WhatsApp is authenticated and connected.');
+                return { success: false, errorMessage: 'WhatsApp not connected. Please authenticate first.' };
             }
 
             try {
-                // Validate and format phone number for WhatsApp
-                const cleanNumber = recipient.replace(/\D/g, '');
-                if (!cleanNumber || cleanNumber.length < 10) {
-                    throw new Error('Invalid phone number format');
+                // Format JID for WhatsApp
+                const jid = formatWhatsAppJID(phoneValidation.cleanNumber);
+
+                // Validate message length (WhatsApp limit is around 65536 characters)
+                if (message.length > 65000) {
+                    throw new Error('Message too long. Maximum length is 65,000 characters.');
                 }
 
-                const jid = `${cleanNumber}@s.whatsapp.net`;
+                // Send message using Baileys with timeout
+                logger.info(`Sending WhatsApp message to ${jid}`);
+                const sendPromise = this.socket.sendMessage(jid, { 
+                    text: message.trim() 
+                });
+                
+                // Add timeout to prevent hanging
+                const timeoutPromise = new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error('Message send timeout after 30 seconds')), 30000)
+                );
+                
+                const sentMessage = await Promise.race([sendPromise, timeoutPromise]);
 
-                // Send message using Baileys
-                const sentMessage = await this.socket.sendMessage(jid, { text: message });
+                if (sentMessage && sentMessage.key) {
+                    await this.messageRepository.markAsSent(msg.id, sentMessage.key.id || 'unknown');
+                    logger.info(`WhatsApp message sent successfully to ${sanitizedRecipient} with ID: ${sentMessage.key.id}`);
+                    return { 
+                        success: true, 
+                        externalMessageId: sentMessage.key.id 
+                    };
+                } else {
+                    throw new Error('Message sent but no response received from WhatsApp');
+                }
 
-                await this.messageRepository.markAsSent(msg.id, sentMessage?.key?.id || 'unknown');
-                return { success: true, externalMessageId: sentMessage?.key?.id };
             } catch (sendError) {
-                const errorMessage = sendError instanceof Error ? sendError.message : 'Failed to send message';
+                let errorMessage = 'Failed to send WhatsApp message';
+                
+                if (sendError instanceof Error) {
+                    errorMessage = sendError.message;
+                    
+                    // Handle specific WhatsApp errors
+                    if (errorMessage.includes('not-authorized')) {
+                        errorMessage = 'WhatsApp session expired. Please re-authenticate.';
+                    } else if (errorMessage.includes('rate-overlimit')) {
+                        errorMessage = 'Rate limit exceeded. Please try again later.';
+                    } else if (errorMessage.includes('unavailable')) {
+                        errorMessage = 'Recipient phone number is not available on WhatsApp.';
+                    } else if (errorMessage.includes('timeout')) {
+                        errorMessage = 'Message send timeout. Please check your connection and try again.';
+                    }
+                }
+
                 logger.error('Baileys WhatsApp send error:', {
                     error: errorMessage,
-                    recipient,
+                    originalError: sendError instanceof Error ? sendError.stack : sendError,
+                    recipient: sanitizedRecipient,
                     connected: this.connected,
                     socketExists: !!this.socket
                 });
+
                 await this.messageRepository.markAsFailed(msg.id, errorMessage);
                 return { success: false, errorMessage };
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            logger.error('Baileys WhatsApp send failed', { error: errorMessage });
-            return { success: false, errorMessage };
+            const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+            logger.error('Baileys WhatsApp send failed (database error):', { 
+                error: errorMessage,
+                recipient: phoneValidation.formatted || recipient
+            });
+            return { success: false, errorMessage: `Database error: ${errorMessage}` };
         }
     }
 
@@ -449,62 +408,23 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
 
     public async reconnect(): Promise<void> {
         logger.info('Reconnecting Baileys WhatsApp client');
-
-        // First disconnect if already connected
-        if (this.socket) {
-            await this.disconnect();
-        }
-
-        // Reset state
-        this.initialized = false;
-        this.connected = false;
-
-        // Wait a bit for cleanup
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Reinitialize
+        await this.disconnect();
         await this.init();
     }
 
     public async forceReset(): Promise<void> {
         logger.info('Force resetting Baileys WhatsApp client state');
-
-        // Force cleanup
-        if (this.socket) {
-            try {
-                this.socket.end(undefined);
-            } catch (error) {
-                logger.warn('Error ending socket during force reset:', error);
-            }
-        }
-
-        this.socket = null;
-        this.initialized = false;
-        this.connected = false;
-        this.authState = null;
-        this.reconnectAttempts = 0;
-
-        await this.statusRepository.markAsDisconnected('whatsapp');
-        await this.statusRepository.clearWhatsAppQRCode();
-        this.emit('disconnected');
-
-        logger.info('Baileys WhatsApp client state force reset completed');
+        await this.disconnect();
     }
 
     public async cleanRestart(): Promise<void> {
         logger.info('Performing clean restart of Baileys WhatsApp client');
-
-        // Clear any existing QR code first
-        await this.statusRepository.clearWhatsAppQRCode();
-
-        // Force reset first
         await this.forceReset();
 
         // Delete existing session files to force new QR generation
         try {
             const fs = require('fs');
             const sessionPath = config.whatsapp.sessionPath;
-
             if (fs.existsSync(sessionPath)) {
                 fs.rmSync(sessionPath, { recursive: true, force: true });
                 logger.info('Deleted existing session files for fresh start');
@@ -513,75 +433,43 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
             logger.warn('Error deleting session files:', error);
         }
 
-        // Wait a bit for cleanup
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Then initialize fresh
         await this.init();
-
-        logger.info('Baileys WhatsApp client clean restart completed');
     }
 
     public async forceNewSession(): Promise<void> {
-        logger.info('Forcing new WhatsApp session (deleting existing auth state)');
-
-        // First disconnect
-        await this.forceReset();
-
-        // Delete existing session files to force new QR generation
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const sessionPath = config.whatsapp.sessionPath;
-
-            if (fs.existsSync(sessionPath)) {
-                fs.rmSync(sessionPath, { recursive: true, force: true });
-                logger.info('Deleted existing session files');
-            }
-        } catch (error) {
-            logger.warn('Error deleting session files:', error);
-        }
-
-        // Wait and reinitialize
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await this.init();
-
-        logger.info('New session initialization completed');
+        logger.info('Forcing new WhatsApp session');
+        await this.cleanRestart();
     }
 
-    // Keep for backward compatibility
     public async connectSimulated(): Promise<void> {
         logger.warn('connectSimulated called on Baileys provider - using real connection');
         await this.init();
     }
 
-    // Method to stop reconnection loops manually
     public stopReconnectionLoop(): void {
         logger.info('Manually stopping reconnection loop');
-        this.reconnectAttempts = this.maxReconnectAttempts;
+        this.stopPolling();
         this.initialized = false;
     }
 
-    // Check if we're in a reconnection loop
-    public isInReconnectionLoop(): boolean {
-        return this.reconnectAttempts >= this.maxReconnectAttempts;
+    public resetReconnectionAttempts(): void {
+        logger.info('Resetting reconnection attempts counter');
+        // No-op for polling approach
     }
 
-    // Manual method to trigger connection (for debugging)
+    public isInReconnectionLoop(): boolean {
+        return false; // No reconnection loops in polling approach
+    }
+
     public async startConnection(): Promise<void> {
         if (!this.socket) {
             logger.error('Cannot start connection: socket not initialized');
             return;
         }
-
-        logger.info('Manually triggering Baileys connection...');
-        // In Baileys, the connection starts automatically when the socket is created
-        // But we can check the state and log it
         logger.info('Socket exists:', !!this.socket);
         logger.info('Current connection state:', this.connected);
     }
 
-    // Wait for QR code to be generated (with timeout)
     public async waitForQRCode(timeoutMs: number = 10000): Promise<string | null> {
         logger.info('Waiting for QR code generation...', { timeoutMs });
 
@@ -597,8 +485,6 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
             }
 
             logger.debug(`QR code check attempt ${attempts}, no QR found yet`);
-
-            // Wait 500ms before checking again
             await new Promise(resolve => setTimeout(resolve, 500));
         }
 
@@ -606,62 +492,38 @@ export class BaileysWhatsAppProvider extends (EventEmitter as { new(): EventEmit
         return null;
     }
 
-    // Check if we're in a stream error state and need recovery
     public async isInStreamErrorState(): Promise<boolean> {
-        // Check if we're supposed to be connected but aren't
-        if (!this.connected && this.initialized) {
-            // Check if there's no QR code available (indicating a stuck state)
-            const qrCode = await this.statusRepository.getWhatsAppQRCode();
-            if (!qrCode) {
-                logger.info('Detected potential stream error state: initialized but not connected and no QR code');
-                return true;
-            }
-        }
-        return false;
+        return !this.connected && this.initialized;
     }
 
-    // Enhanced recovery method specifically for stream errors
     public async recoverFromStreamError(): Promise<void> {
         logger.info('Starting stream error recovery process');
-
-        // Force complete cleanup
-        if (this.socket) {
-            try {
-                this.socket.end(undefined);
-            } catch (error) {
-                logger.warn('Error ending socket during stream recovery:', error);
-            }
-        }
-
-        this.socket = null;
-        this.initialized = false;
-        this.connected = false;
-        this.authState = null;
-
-        // Clear status and QR code
-        await this.statusRepository.markAsDisconnected('whatsapp');
-        await this.statusRepository.clearWhatsAppQRCode();
-
-        // Clear session files to force fresh authentication
-        try {
-            const fs = require('fs');
-            const sessionPath = config.whatsapp.sessionPath;
-
-            if (fs.existsSync(sessionPath)) {
-                fs.rmSync(sessionPath, { recursive: true, force: true });
-                logger.info('Cleared session files for stream error recovery');
-            }
-        } catch (error) {
-            logger.warn('Error clearing session files during stream recovery:', error);
-        }
-
-        // Wait longer for complete cleanup
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Reinitialize with fresh state
+        await this.forceReset();
         await this.init();
+    }
 
-        logger.info('Stream error recovery completed');
+    public getConnectionStatus(): {
+        connected: boolean;
+        initialized: boolean;
+        socketExists: boolean;
+        authStateExists: boolean;
+    } {
+        return {
+            connected: this.connected,
+            initialized: this.initialized,
+            socketExists: !!this.socket,
+            authStateExists: !!this.authState,
+        };
+    }
+
+    public async handlePostScanConnection(): Promise<void> {
+        logger.info('Handling post-scan connection gracefully');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (this.connected && this.socket) {
+            logger.info('Post-scan connection successful');
+        } else {
+            logger.warn('Post-scan connection not established properly');
+        }
     }
 }
 

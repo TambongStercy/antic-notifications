@@ -58,7 +58,7 @@ graph LR
 
 #### 2. Service Layer
 - **NotificationService**: Orchestrates message sending
-- **WhatsAppProvider**: Manages WhatsApp Web.js client
+- **BaileysWhatsAppProvider**: Manages WhatsApp using Baileys library
 - **TelegramProvider**: Manages Telegram bot client
 - **AuthenticationManager**: Handles service authentication states
 

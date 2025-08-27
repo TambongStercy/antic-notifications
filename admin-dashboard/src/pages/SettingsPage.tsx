@@ -17,7 +17,6 @@ const SettingsPage: React.FC = () => {
     const appInfo = {
         version: '1.0.0',
         apiEndpoint: window.location.origin.replace('3001', '3000'),
-        websocketEndpoint: window.location.origin.replace('3001', '3002'),
         currency: 'FCFA',
     }
 
@@ -101,13 +100,6 @@ const SettingsPage: React.FC = () => {
                                     <ListItemText
                                         primary="API Endpoint"
                                         secondary={appInfo.apiEndpoint}
-                                    />
-                                </ListItem>
-                                <Divider />
-                                <ListItem>
-                                    <ListItemText
-                                        primary="WebSocket Endpoint"
-                                        secondary={appInfo.websocketEndpoint}
                                     />
                                 </ListItem>
                                 <Divider />

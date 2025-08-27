@@ -10,9 +10,9 @@ import {
 } from '@mui/material'
 import AnticLoader from '@/components/AnticLoader'
 import {
-    TrendingUp,
     WhatsApp,
     Telegram,
+    Forum,
     Storage,
     CheckCircle,
     Error,
@@ -26,13 +26,18 @@ import { format } from 'date-fns'
 // Service-specific colors
 const SERVICE_COLORS = {
     whatsapp: {
-        sent: '#25D366',      // WhatsApp green
-        pending: '#A8E6CF',   // Light green
+        sent: '#42A5F5',      // Blue
+        pending: '#90CAF9',   // Light blue
         failed: '#FF5252'     // Red
     },
     telegram: {
         sent: '#0088CC',      // Telegram blue
         pending: '#81C7E8',   // Light blue
+        failed: '#FF5252'     // Red
+    },
+    mattermost: {
+        sent: '#0072C6',      // Mattermost blue
+        pending: '#87CEEB',   // Light blue
         failed: '#FF5252'     // Red
     }
 }
@@ -119,6 +124,9 @@ const Dashboard: React.FC = () => {
         telegramSent: stats.messageStats.find(s => s.service === 'telegram')?.stats.find(st => st.status === 'sent')?.count || 0,
         telegramPending: stats.messageStats.find(s => s.service === 'telegram')?.stats.find(st => st.status === 'pending')?.count || 0,
         telegramFailed: stats.messageStats.find(s => s.service === 'telegram')?.stats.find(st => st.status === 'failed')?.count || 0,
+        mattermostSent: stats.messageStats.find(s => s.service === 'mattermost')?.stats.find(st => st.status === 'sent')?.count || 0,
+        mattermostPending: stats.messageStats.find(s => s.service === 'mattermost')?.stats.find(st => st.status === 'pending')?.count || 0,
+        mattermostFailed: stats.messageStats.find(s => s.service === 'mattermost')?.stats.find(st => st.status === 'failed')?.count || 0,
     }] : []
 
     const pieData = stats?.messageStats.flatMap(service =>
@@ -137,7 +145,7 @@ const Dashboard: React.FC = () => {
                     sx={{
                         fontFamily: '"Inter", sans-serif',
                         fontWeight: 800,
-                        background: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 30%, #D32F2F 70%, #F57C00 100%)',
+                        background: 'linear-gradient(135deg, #1976D2 0%, #42A5F5 30%, #D32F2F 70%, #F57C00 100%)',
                         backgroundClip: 'text',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
@@ -206,7 +214,7 @@ const Dashboard: React.FC = () => {
                                         }}
                                     />
                                 </Box>
-                                <Storage sx={{ color: '#2E7D32', fontSize: '2.5rem', opacity: 0.8 }} />
+                                <Storage sx={{ color: '#1976D2', fontSize: '2.5rem', opacity: 0.8 }} />
                             </Box>
                         </CardContent>
                     </Card>
@@ -254,7 +262,7 @@ const Dashboard: React.FC = () => {
                                         }}
                                     />
                                 </Box>
-                                <WhatsApp sx={{ color: '#4CAF50', fontSize: '2.5rem', opacity: 0.8 }} />
+                                <WhatsApp sx={{ color: '#42A5F5', fontSize: '2.5rem', opacity: 0.8 }} />
                             </Box>
                         </CardContent>
                     </Card>
@@ -318,8 +326,8 @@ const Dashboard: React.FC = () => {
                             transition: 'all 0.3s ease',
                             '&:hover': {
                                 transform: 'translateY(-4px)',
-                                boxShadow: '0 8px 32px rgba(245, 124, 0, 0.12)',
-                                border: '2px solid rgba(245, 124, 0, 0.15)',
+                                boxShadow: '0 8px 32px rgba(0, 114, 198, 0.12)',
+                                border: '2px solid rgba(0, 114, 198, 0.15)',
                             },
                         }}
                     >
@@ -336,12 +344,12 @@ const Dashboard: React.FC = () => {
                                             mb: 1.5,
                                         }}
                                     >
-                                        Overall Status
+                                        Mattermost
                                     </Typography>
                                     <Chip
-                                        icon={getStatusIcon(health?.status || 'unhealthy') || undefined}
-                                        label={health?.status || 'Unknown'}
-                                        color={getStatusColor(health?.status || 'unhealthy') as any}
+                                        icon={getStatusIcon(health?.services.mattermost || 'not_configured') || undefined}
+                                        label={health?.services.mattermost || 'Unknown'}
+                                        color={getStatusColor(health?.services.mattermost || 'not_configured') as any}
                                         size="small"
                                         sx={{
                                             fontWeight: 600,
@@ -350,7 +358,7 @@ const Dashboard: React.FC = () => {
                                         }}
                                     />
                                 </Box>
-                                <TrendingUp sx={{ color: '#F57C00', fontSize: '2.5rem', opacity: 0.8 }} />
+                                <Forum sx={{ color: '#0072C6', fontSize: '2.5rem', opacity: 0.8 }} />
                             </Box>
                         </CardContent>
                     </Card>
@@ -519,7 +527,7 @@ const Dashboard: React.FC = () => {
                                     <Typography
                                         variant="h5"
                                         sx={{
-                                            color: '#2E7D32',
+                                            color: '#1976D2',
                                             fontWeight: 700,
                                             fontFamily: '"Inter", sans-serif',
                                             fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
@@ -553,7 +561,7 @@ const Dashboard: React.FC = () => {
                                     variant="h6"
                                     gutterBottom
                                     sx={{
-                                        color: '#2E7D32',
+                                        color: '#1976D2',
                                         fontWeight: 700,
                                         fontFamily: '"Inter", sans-serif',
                                         mb: 3,
@@ -590,6 +598,9 @@ const Dashboard: React.FC = () => {
                                         <Bar dataKey="telegramSent" fill="#0088CC" name="Telegram Sent" radius={[4, 4, 0, 0]} />
                                         <Bar dataKey="telegramPending" fill="#81C7E8" name="Telegram Pending" radius={[4, 4, 0, 0]} />
                                         <Bar dataKey="telegramFailed" fill="#FF5252" name="Telegram Failed" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="mattermostSent" fill="#0072C6" name="Mattermost Sent" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="mattermostPending" fill="#87CEEB" name="Mattermost Pending" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="mattermostFailed" fill="#FF5252" name="Mattermost Failed" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </CardContent>
@@ -616,7 +627,7 @@ const Dashboard: React.FC = () => {
                                     variant="h6"
                                     gutterBottom
                                     sx={{
-                                        color: '#2E7D32',
+                                        color: '#1976D2',
                                         fontWeight: 700,
                                         fontFamily: '"Inter", sans-serif',
                                         mb: 3,

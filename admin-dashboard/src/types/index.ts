@@ -10,18 +10,21 @@ export interface AuthTokens {
 }
 
 export interface ServiceStatus {
-    service: 'whatsapp' | 'telegram'
-    status: 'connected' | 'disconnected' | 'authenticating' | 'not_configured'
+    service: 'whatsapp' | 'telegram' | 'mattermost'
+    status: 'connected' | 'disconnected' | 'not_configured' | 'authenticating'
     lastUpdated: string
     metadata?: {
         qrCode?: string
         botToken?: string
+        serverUrl?: string
+        accessToken?: string
+        hasAccessToken?: boolean
     }
 }
 
 export interface Message {
     id: string
-    service: 'whatsapp' | 'telegram'
+    service: 'whatsapp' | 'telegram' | 'mattermost'
     recipient: string
     message: string
     status: 'pending' | 'sent' | 'failed'
@@ -33,7 +36,7 @@ export interface Message {
 
 export interface MessageStats {
     messageStats: Array<{
-        service: 'whatsapp' | 'telegram'
+        service: 'whatsapp' | 'telegram' | 'mattermost'
         stats: Array<{
             status: 'pending' | 'sent' | 'failed'
             count: number
@@ -52,8 +55,9 @@ export interface HealthResponse {
     timestamp: string
     services: {
         database: 'connected' | 'disconnected'
-        whatsapp: 'connected' | 'disconnected' | 'authenticating' | 'not_configured'
-        telegram: 'connected' | 'disconnected' | 'not_configured'
+        whatsapp: 'connected' | 'disconnected' | 'not_configured' | 'authenticating'
+        telegram: 'connected' | 'disconnected' | 'not_configured' | 'authenticating'
+        mattermost: 'connected' | 'disconnected' | 'not_configured' | 'authenticating'
     }
     uptime: number
     version: string
@@ -73,10 +77,4 @@ export interface NotificationRequest {
     recipient: string
     message: string
     metadata?: Record<string, any>
-}
-
-export interface WebSocketEvents {
-    'qr-code': { service: string; qrCode: string }
-    'service-status': { service: string; status: string }
-    'message-status': { messageId: string; status: string }
 }

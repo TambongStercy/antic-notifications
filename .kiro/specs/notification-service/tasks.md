@@ -5,7 +5,7 @@
 
   - Create directory structure for models, services, repositories, and API components
   - Initialize TypeScript configuration with strict settings
-  - Set up package.json with required dependencies (express, mongoose, whatsapp-web.js, node-telegram-bot-api)
+  - Set up package.json with required dependencies (express, mongoose, @whiskeysockets/baileys, node-telegram-bot-api)
   - Create environment configuration files and validation
   - _Requirements: 6.1, 6.2, 6.3_
 
@@ -29,8 +29,8 @@
   - Write unit tests for all repository operations
   - _Requirements: 6.1, 6.2, 6.4, 6.5_
 
-- [ ] 4. Implement WhatsApp service provider
-  - Create WhatsAppProvider class using whatsapp-web.js
+- [x] 4. Implement WhatsApp service provider
+  - Create BaileysWhatsAppProvider class using Baileys
   - Implement QR code generation and authentication handling
   - Add message sending functionality with error handling
   - Implement session persistence and restoration

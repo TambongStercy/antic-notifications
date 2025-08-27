@@ -47,7 +47,7 @@ const AnticLoader: React.FC<AnticLoaderProps> = ({
                     right: 0,
                     bottom: 0,
                     background: `
-            radial-gradient(circle at 20% 30%, rgba(46, 125, 50, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 20% 30%, rgba(25, 118, 210, 0.03) 0%, transparent 50%),
             radial-gradient(circle at 80% 70%, rgba(245, 124, 0, 0.03) 0%, transparent 50%),
             radial-gradient(circle at 50% 50%, rgba(211, 47, 47, 0.02) 0%, transparent 50%)
           `,
@@ -75,7 +75,7 @@ const AnticLoader: React.FC<AnticLoaderProps> = ({
                         borderRadius: '50%',
                         background: `conic-gradient(
               from 0deg,
-              #2E7D32 0deg 120deg,
+              #1976D2 0deg 120deg,
               #D32F2F 120deg 240deg,
               #F57C00 240deg 360deg
             )`,
@@ -107,7 +107,7 @@ const AnticLoader: React.FC<AnticLoaderProps> = ({
                         height: size * 0.6,
                         borderRadius: '50%',
                         overflow: 'hidden',
-                        boxShadow: '0 4px 20px rgba(46, 125, 50, 0.15)',
+                        boxShadow: '0 4px 20px rgba(25, 118, 210, 0.15)',
                         zIndex: 2,
                         border: '3px solid #FFFFFF',
                     }}

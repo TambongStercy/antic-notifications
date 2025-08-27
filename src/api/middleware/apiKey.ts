@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiKeyRepository } from '@/database/repositories/ApiKeyRepository';
+import { config } from '@/config/environment';
 import logger from '@/utils/logger';
 
 interface AuthenticatedRequest extends Request {
@@ -19,10 +20,53 @@ const apiKeyRepo = new ApiKeyRepository();
 // Rate limiting store (in production, use Redis)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-export const apiKeyAuth = (requiredPermission?: string) => {
+export const apiKeyAuth = (requiredPermission?: string, allowSameOrigin: boolean = false) => {
     return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const apiKey = req.headers['x-api-key'] as string;
+            
+            // Same-origin exemption (ONLY if explicitly enabled and from trusted origin)
+            if (allowSameOrigin && !apiKey) {
+                const origin = req.headers.origin;
+                const referer = req.headers.referer;
+                const trustedOrigins = [config.cors.origin];
+                
+                // Check if request is from trusted origin (admin dashboard)
+                const isFromTrustedOrigin = trustedOrigins.some(trustedOrigin => 
+                    origin === trustedOrigin || referer?.startsWith(trustedOrigin + '/')
+                );
+                
+                if (isFromTrustedOrigin) {
+                    // Create a virtual API key for same-origin requests with limited permissions
+                    req.apiKey = {
+                        id: 'same-origin',
+                        name: 'Same-Origin Request (Admin Dashboard)',
+                        permissions: ['messages:read', 'status:read'], // Limited permissions
+                        rateLimit: { requests: 1000, windowMs: 3600000 } // Higher rate limit but still limited
+                    };
+                    (req as any).requestedBy = 'apiKey:same-origin';
+                    
+                    // Still check permissions
+                    if (requiredPermission && !req.apiKey.permissions.includes(requiredPermission)) {
+                        return res.status(403).json({
+                            error: {
+                                code: 'insufficient_permissions',
+                                message: `Same-origin requests don't have permission: ${requiredPermission}. Use an API key instead.`
+                            },
+                            timestamp: new Date().toISOString(),
+                            path: req.originalUrl
+                        });
+                    }
+                    
+                    logger.info('Same-origin request authenticated', {
+                        origin,
+                        referer,
+                        path: req.originalUrl
+                    });
+                    
+                    return next();
+                }
+            }
 
             if (!apiKey) {
                 return res.status(401).json({
@@ -35,7 +79,25 @@ export const apiKeyAuth = (requiredPermission?: string) => {
                 });
             }
 
-            // Validate API key format
+            // Check for master API key from .env (no rate limiting, full permissions)
+            if (config.security.masterApiKey && apiKey === config.security.masterApiKey) {
+                req.apiKey = {
+                    id: 'master',
+                    name: 'Master API Key (.env)',
+                    permissions: ['whatsapp:send', 'telegram:send', 'mattermost:send', 'messages:read', 'status:read'],
+                    rateLimit: { requests: Infinity, windowMs: 0 }
+                };
+                (req as any).requestedBy = 'apiKey:master';
+                
+                logger.info('Master API key authenticated', {
+                    path: req.originalUrl,
+                    ip: req.ip
+                });
+                
+                return next();
+            }
+
+            // Validate API key format for database keys
             if (!apiKey.startsWith('ak_') || apiKey.length !== 35) {
                 return res.status(401).json({
                     error: {

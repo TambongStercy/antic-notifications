@@ -15,9 +15,7 @@ import {
     Settings as SettingsIcon,
     Message as MessageIcon,
     Build as ServicesIcon,
-    Analytics,
     Security,
-    Notifications,
 } from '@mui/icons-material'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -85,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                     width: drawerWidth,
                     boxSizing: 'border-box',
                     background: 'linear-gradient(180deg, #FFFFFF 0%, #F8F9FA 100%)',
-                    borderRight: '1px solid rgba(46, 125, 50, 0.05)',
+                    borderRight: '1px solid rgba(25, 118, 210, 0.05)',
                     boxShadow: 'none',
                     borderRadius: 0, // Remove any border radius
                 },
@@ -103,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                         background: 'transparent',
                     },
                     '&::-webkit-scrollbar-thumb': {
-                        background: 'rgba(46, 125, 50, 0.2)',
+                        background: 'rgba(25, 118, 210, 0.2)',
                         borderRadius: '3px',
                         opacity: 0,
                         transition: 'opacity 0.3s ease',
@@ -112,11 +110,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                         opacity: 1,
                     },
                     '&::-webkit-scrollbar-thumb:hover': {
-                        background: 'rgba(46, 125, 50, 0.4)',
+                        background: 'rgba(25, 118, 210, 0.4)',
                     },
                     // For Firefox
                     scrollbarWidth: 'thin',
-                    scrollbarColor: 'rgba(46, 125, 50, 0.2) transparent',
+                    scrollbarColor: 'rgba(25, 118, 210, 0.2) transparent',
                 }}
             >
                 <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0)', mx: 2, mt: 5 }} />
@@ -134,19 +132,19 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                                         py: 1.5,
                                         px: 2,
                                         background: isActive
-                                            ? 'linear-gradient(90deg, rgba(46, 125, 50, 0.15), rgba(46, 125, 50, 0.08))'
+                                            ? 'linear-gradient(90deg, rgba(25, 118, 210, 0.15), rgba(25, 118, 210, 0.08))'
                                             : 'transparent',
                                         border: isActive
-                                            ? '2px solid rgba(46, 125, 50, 0.3)'
+                                            ? '2px solid rgba(25, 118, 210, 0.3)'
                                             : '2px solid transparent',
                                         boxShadow: isActive
-                                            ? '0 3px 12px rgba(46, 125, 50, 0.15)'
+                                            ? '0 3px 12px rgba(25, 118, 210, 0.15)'
                                             : 'none',
                                         '&:hover': {
                                             background: isActive
-                                                ? 'linear-gradient(90deg, rgba(46, 125, 50, 0.2), rgba(46, 125, 50, 0.1))'
-                                                : 'rgba(46, 125, 50, 0.05)',
-                                            border: '2px solid rgba(46, 125, 50, 0.2)',
+                                                ? 'linear-gradient(90deg, rgba(25, 118, 210, 0.2), rgba(25, 118, 210, 0.1))'
+                                                : 'rgba(25, 118, 210, 0.05)',
+                                            border: '2px solid rgba(25, 118, 210, 0.2)',
                                             transform: 'translateX(2px)',
                                         },
                                         transition: 'all 0.3s ease',
@@ -154,7 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                                 >
                                     <ListItemIcon
                                         sx={{
-                                            color: isActive ? '#2E7D32' : '#757575',
+                                            color: isActive ? '#1976D2' : '#757575',
                                             minWidth: 40,
                                         }}
                                     >
@@ -167,7 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                                                     fontFamily: '"Inter", sans-serif',
                                                     fontWeight: isActive ? 700 : 500,
                                                     fontSize: '0.9rem',
-                                                    color: isActive ? '#2E7D32' : '#424242',
+                                                    color: isActive ? '#1976D2' : '#424242',
                                                     letterSpacing: '0.5px',
                                                 }}
                                             >
@@ -179,7 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                                                 sx={{
                                                     fontFamily: '"Inter", sans-serif',
                                                     fontSize: '0.75rem',
-                                                    color: isActive ? '#2E7D32' : '#757575',
+                                                    color: isActive ? '#1976D2' : '#757575',
                                                     letterSpacing: '0.25px',
                                                 }}
                                             >
@@ -214,7 +212,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                                 bottom: 0,
                                 borderRadius: '16px',
                                 padding: '2px',
-                                background: 'linear-gradient(45deg, #2E7D32, #D32F2F, #F57C00)',
+                                background: 'linear-gradient(45deg, #1976D2, #D32F2F, #F57C00)',
                                 mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                                 maskComposite: 'xor',
                                 WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
@@ -222,11 +220,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'temporary' 
                             },
                         }}
                     >
-                        <Security sx={{ color: '#2E7D32', mb: 1, fontSize: '2rem', position: 'relative', zIndex: 1 }} />
+                        <Security sx={{ color: '#1976D2', mb: 1, fontSize: '2rem', position: 'relative', zIndex: 1 }} />
                         <Typography
                             variant="caption"
                             sx={{
-                                color: '#2E7D32',
+                                color: '#1976D2',
                                 fontFamily: '"Inter", sans-serif',
                                 fontWeight: 700,
                                 display: 'block',

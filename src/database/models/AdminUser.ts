@@ -1,13 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { AdminUser } from '@/types';
+import { AdminUser as AdminUserType } from '@/types';
 import { config } from '@/config/environment';
 
-export interface IAdminUser extends Omit<AdminUser, 'id'>, Document {
+export interface IAdminUser extends Omit<AdminUserType, 'id'>, Document {
   _id: mongoose.Types.ObjectId;
   passwordHash: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
-  toSafeObject(): Omit<AdminUser, 'passwordHash'>;
+  toSafeObject(): Omit<AdminUserType, 'passwordHash'>;
 }
 
 const AdminUserSchema = new Schema<IAdminUser>({
@@ -59,9 +59,11 @@ AdminUserSchema.virtual('id').get(function(this: IAdminUser) {
 AdminUserSchema.set('toJSON', {
   virtuals: true,
   transform: function(_doc, ret) {
-    delete ret._id;
-    delete ret.__v;
-    delete ret.passwordHash; // Never include password hash in JSON
+    // Remove MongoDB specific fields
+    if (ret._id) delete ret._id;
+    if (ret.__v !== undefined) delete ret.__v;
+    // Remove sensitive data
+    if (ret.passwordHash) delete ret.passwordHash;
     return ret;
   },
 });
@@ -76,7 +78,7 @@ AdminUserSchema.pre('save', async function(this: IAdminUser, next) {
   try {
     // Hash password with configured rounds
     const salt = await bcrypt.genSalt(config.security.bcryptRounds);
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
+    this['passwordHash'] = await bcrypt.hash(this['passwordHash'], salt);
     next();
   } catch (error) {
     next(error as Error);
@@ -137,8 +139,8 @@ AdminUserSchema.statics.changePassword = async function(
     throw new Error('Admin user not found');
   }
 
-  admin.passwordHash = newPassword; // Will be hashed by pre-save middleware
-  return admin.save();
+  admin['passwordHash'] = newPassword; // Will be hashed by pre-save middleware
+  return admin['save']();
 };
 
 // Instance methods
@@ -154,13 +156,13 @@ AdminUserSchema.methods.comparePassword = async function(
 };
 
 AdminUserSchema.methods.updateLastLogin = function(this: IAdminUser) {
-  this.lastLogin = new Date();
-  return this.save();
+  this['lastLogin'] = new Date();
+  return this['save']();
 };
 
 AdminUserSchema.methods.toSafeObject = function(this: IAdminUser) {
-  const obj = this.toObject();
-  delete obj.passwordHash;
+  const obj = this['toObject']();
+  if (obj.passwordHash) delete obj.passwordHash;
   return obj;
 };
 
@@ -168,10 +170,14 @@ AdminUserSchema.methods.isValidPassword = function(password: string): boolean {
   return password.length >= 6;
 };
 
+export const AdminUser = mongoose.model<IAdminUser>('AdminUser', AdminUserSchema);
+
 // Ensure indexes are created
 AdminUserSchema.post('init', function() {
-  this.constructor.createIndexes();
+  // Create indexes manually
+  AdminUser.createIndexes().catch(error => {
+    console.warn('Failed to create indexes for AdminUser:', error);
+  });
 });
 
-export const AdminUser = mongoose.model<IAdminUser>('AdminUser', AdminUserSchema);
 export default AdminUser;

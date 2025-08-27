@@ -40,6 +40,9 @@ const envSchema = Joi.object({
   BCRYPT_ROUNDS: Joi.number().default(12),
   RATE_LIMIT_WINDOW_MS: Joi.number().default(900000),
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
+  
+  // API Key
+  MASTER_API_KEY: Joi.string().allow('').optional(),
 
   // CORS
   CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
@@ -49,8 +52,6 @@ const envSchema = Joi.object({
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
   LOG_FILE: Joi.string().default('logs/app.log'),
 
-  // WebSocket
-  WEBSOCKET_PORT: Joi.number().default(3002)
 }).unknown();
 
 // Validate environment variables
@@ -97,7 +98,8 @@ export const config = {
     rateLimit: {
       windowMs: envVars.RATE_LIMIT_WINDOW_MS,
       maxRequests: envVars.RATE_LIMIT_MAX_REQUESTS
-    }
+    },
+    masterApiKey: envVars.MASTER_API_KEY
   },
 
   cors: {
@@ -110,9 +112,6 @@ export const config = {
     file: envVars.LOG_FILE
   },
 
-  websocket: {
-    port: envVars.WEBSOCKET_PORT
-  }
 };
 
 export default config;

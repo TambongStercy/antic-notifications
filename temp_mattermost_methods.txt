@@ -1,0 +1,9 @@
+    public async sendMattermost(request: NotificationRequest) {
+        if (!this.mattermost.isServiceConnected()) {
+            return { success: false, error: 'Mattermost not configured or connected' };
+        }
+        const result = await this.mattermost.sendText(request.recipient, request.message, request.metadata);
+        return result.success
+            ? { success: true, messageId: result.messageId }
+            : { success: false, error: result.errorMessage };
+    }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
     Box,
@@ -139,7 +139,7 @@ const LoginPage: React.FC = () => {
                             left: 0,
                             right: 0,
                             height: '6px',
-                            background: 'linear-gradient(90deg, #1B5E20, #C62828, #F57C00, #1B5E20)',
+                            background: 'linear-gradient(90deg, #0D47A1, #C62828, #F57C00, #0D47A1)',
                             backgroundSize: '300% 100%',
                             animation: 'anticShimmer 5s linear infinite',
                             '@keyframes anticShimmer': {
@@ -172,7 +172,7 @@ const LoginPage: React.FC = () => {
                                         width: '90px',
                                         borderRadius: '50%',
                                         border: '4px solid transparent',
-                                        background: 'linear-gradient(white, white) padding-box, linear-gradient(45deg, #2E7D32, #D32F2F, #FFC107) border-box',
+                                        background: 'linear-gradient(white, white) padding-box, linear-gradient(45deg, #1976D2, #D32F2F, #FFC107) border-box',
                                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
                                     }}
                                 />
@@ -208,8 +208,8 @@ const LoginPage: React.FC = () => {
                                     gap: '2px',
                                 }}
                             >
-                                <span style={{ color: '#1B5E20' }}>A</span>
-                                <span style={{ color: '#1B5E20' }}>N</span>
+                                <span style={{ color: '#0D47A1' }}>A</span>
+                                <span style={{ color: '#0D47A1' }}>N</span>
                                 <span style={{ color: '#C62828' }}>T</span>
                                 <span style={{ color: '#F57C00' }}>I</span>
                                 <span style={{ color: '#FF6F00' }}>C</span>
@@ -229,7 +229,7 @@ const LoginPage: React.FC = () => {
                             </Typography>
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Security sx={{ color: '#1B5E20', fontSize: '1.2rem' }} />
+                                <Security sx={{ color: '#0D47A1', fontSize: '1.2rem' }} />
                                 <Typography
                                     variant="body2"
                                     sx={{
@@ -271,7 +271,7 @@ const LoginPage: React.FC = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <Person sx={{ color: '#1B5E20' }} />
+                                            <Person sx={{ color: '#0D47A1' }} />
                                         </InputAdornment>
                                     ),
                                 }}
@@ -293,7 +293,7 @@ const LoginPage: React.FC = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <Lock sx={{ color: '#1B5E20' }} />
+                                            <Lock sx={{ color: '#0D47A1' }} />
                                         </InputAdornment>
                                     ),
                                     endAdornment: (
@@ -301,7 +301,7 @@ const LoginPage: React.FC = () => {
                                             <IconButton
                                                 onClick={handleTogglePassword}
                                                 edge="end"
-                                                sx={{ color: '#1B5E20' }}
+                                                sx={{ color: '#0D47A1' }}
                                             >
                                                 {showPassword ? <VisibilityOff /> : <Visibility />}
                                             </IconButton>
@@ -365,7 +365,7 @@ const LoginPage: React.FC = () => {
                                 }}
                             >
                                 <strong>Default Credentials:</strong><br />
-                                <Box component="span" sx={{ color: '#1B5E20', fontWeight: 700 }}>admin</Box>
+                                <Box component="span" sx={{ color: '#0D47A1', fontWeight: 700 }}>admin</Box>
                                 {' | '}
                                 <Box component="span" sx={{ color: '#C62828', fontWeight: 700 }}>admin123</Box>
                             </Typography>

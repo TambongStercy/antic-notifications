@@ -21,10 +21,10 @@ const AnticBackground: React.FC = () => {
 
         // ANTIC brand colors from the logo - using darker, more visible shades
         const colors = {
-            green: '#1B5E20',        // Darker ANTIC Green (A, N)
+            blue: '#0D47A1',        // Darker ANTIC Blue (A, N)
             red: '#C62828',          // Darker ANTIC Red (T)
             yellow: '#F57C00',       // Darker ANTIC Yellow (I, C)
-            lightGreen: '#2E7D32',   // Medium green
+            lightBlue: '#1976D2',   // Medium blue
             lightRed: '#D32F2F',     // Medium red
             lightYellow: '#FF9800',  // Medium yellow
         };
@@ -60,7 +60,7 @@ const AnticBackground: React.FC = () => {
 
         // Connection lines between particles using ANTIC colors
         const drawConnections = () => {
-            const connectionColors = [colors.green, colors.red, colors.yellow];
+            const connectionColors = [colors.blue, colors.red, colors.yellow];
             
             for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
@@ -124,7 +124,7 @@ const AnticBackground: React.FC = () => {
             // Clear canvas with ANTIC-inspired gradient background
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
             gradient.addColorStop(0, '#FAFAFA');
-            gradient.addColorStop(0.3, '#F1F8E9');  // Very light green
+            gradient.addColorStop(0.3, '#E3F2FD');  // Very light blue
             gradient.addColorStop(0.6, '#FFF3E0');  // Very light yellow
             gradient.addColorStop(1, '#FFEBEE');    // Very light red
             ctx.fillStyle = gradient;

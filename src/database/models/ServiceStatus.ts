@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { ServiceStatus, ServiceType, ConnectionStatus } from '@/types';
+import { ServiceStatus as ServiceStatusType, ServiceType, ConnectionStatus } from '@/types';
 
-export interface IServiceStatus extends Omit<ServiceStatus, 'service'>, Document {
+export interface IServiceStatus extends Omit<ServiceStatusType, 'service'>, Document {
   _id: mongoose.Types.ObjectId;
   service: ServiceType;
 }
@@ -9,14 +9,14 @@ export interface IServiceStatus extends Omit<ServiceStatus, 'service'>, Document
 const ServiceStatusSchema = new Schema<IServiceStatus>({
   service: {
     type: String,
-    enum: ['whatsapp', 'telegram'] as ServiceType[],
+    enum: ['whatsapp', 'telegram', 'mattermost'] as ServiceType[],
     required: true,
     unique: true,
     index: true,
   },
   status: {
     type: String,
-    enum: ['connected', 'disconnected', 'authenticating'] as ConnectionStatus[],
+    enum: ['connected', 'disconnected'] as ConnectionStatus[],
     required: true,
     default: 'disconnected',
   },
@@ -39,6 +39,19 @@ const ServiceStatusSchema = new Schema<IServiceStatus>({
       type: Schema.Types.Mixed,
       select: false,
       default: undefined,
+    },
+    // Mattermost configuration
+    serverUrl: {
+      type: String,
+      select: false, // Don't include by default
+    },
+    accessToken: {
+      type: String,
+      select: false, // Don't include by default for security
+    },
+    webhookUrl: {
+      type: String,
+      select: false, // Don't include by default
     },
     connectionInfo: {
       type: Schema.Types.Mixed,
@@ -63,8 +76,9 @@ ServiceStatusSchema.virtual('id').get(function (this: IServiceStatus) {
 ServiceStatusSchema.set('toJSON', {
   virtuals: true,
   transform: function (_doc, ret) {
-    delete ret._id;
-    delete ret.__v;
+    // Remove MongoDB specific fields
+    if (ret._id) delete ret._id;
+    if (ret.__v !== undefined) delete ret.__v;
     // Remove sensitive data from JSON output
     if (ret.metadata?.botToken) {
       ret.metadata.botToken = '***';
@@ -117,47 +131,44 @@ ServiceStatusSchema.methods.updateStatus = function (
   status: ConnectionStatus,
   metadata?: Partial<IServiceStatus['metadata']>
 ) {
-  this.status = status;
-  this.lastUpdated = new Date();
+  this['status'] = status;
+  this['lastUpdated'] = new Date();
 
   if (metadata) {
-    this.metadata = { ...this.metadata, ...metadata };
+    this['metadata'] = { ...this.metadata, ...metadata };
   }
 
-  return this.save();
+  return this['save']();
 };
 
 ServiceStatusSchema.methods.setQRCode = function (qrCode: string) {
-  this.status = 'authenticating';
-  this.metadata = { ...this.metadata, qrCode };
-  this.lastUpdated = new Date();
-  return this.save();
+  this['status'] = 'disconnected';
+  this['metadata'] = { ...this['metadata'], qrCode };
+  this['lastUpdated'] = new Date();
+  return this['save']();
 };
 
 ServiceStatusSchema.methods.setBotToken = function (botToken: string) {
-  this.metadata = { ...this.metadata, botToken };
-  this.lastUpdated = new Date();
-  return this.save();
+  this['metadata'] = { ...this['metadata'], botToken };
+  this['lastUpdated'] = new Date();
+  return this['save']();
 };
 
 ServiceStatusSchema.methods.clearSensitiveData = function () {
-  if (this.metadata) {
-    delete this.metadata.qrCode;
-    delete this.metadata.botToken;
+  if (this['metadata']) {
+    delete this['metadata'].qrCode;
+    delete this['metadata'].botToken;
   }
-  return this.save();
+  return this['save']();
 };
 
 ServiceStatusSchema.methods.isConnected = function (): boolean {
-  return this.status === 'connected';
+  return this['status'] === 'connected';
 };
 
-ServiceStatusSchema.methods.isAuthenticating = function (): boolean {
-  return this.status === 'authenticating';
-};
 
 ServiceStatusSchema.methods.toSafeObject = function () {
-  const obj = this.toObject();
+  const obj = this['toObject']();
   // Remove sensitive information
   if (obj.metadata?.botToken) {
     obj.metadata.botToken = '***';
@@ -168,11 +179,15 @@ ServiceStatusSchema.methods.toSafeObject = function () {
   return obj;
 };
 
+const ServiceStatusModel = mongoose.model<IServiceStatus>('ServiceStatus', ServiceStatusSchema);
+
 // Create indexes after model creation
 ServiceStatusSchema.post('init', function () {
-  // Ensure unique constraint
-  this.constructor.createIndexes();
+  // Create indexes manually
+  ServiceStatusModel.createIndexes().catch(error => {
+    console.warn('Failed to create indexes for ServiceStatus:', error);
+  });
 });
 
-export const ServiceStatus = mongoose.model<IServiceStatus>('ServiceStatus', ServiceStatusSchema);
-export default ServiceStatus;
+export { ServiceStatusModel as ServiceStatus };
+export default ServiceStatusModel;

@@ -24,14 +24,14 @@ export async function initializeDatabase(): Promise<void> {
  */
 async function createDefaultAdmin(): Promise<void> {
   try {
-    const existingAdmin = await AdminUser.findByUsername(config.admin.username);
-    
+    const existingAdmin = await (AdminUser as any).findByUsername(config.admin.username);
+
     if (existingAdmin) {
       logger.info('Default admin user already exists');
       return;
     }
 
-    const admin = await AdminUser.createAdmin(
+    const admin = await (AdminUser as any).createAdmin(
       config.admin.username,
       config.admin.password
     );
@@ -101,10 +101,15 @@ export async function cleanDatabase(): Promise<void> {
     logger.info('Cleaning database...');
 
     // Drop all collections
-    const collections = await AdminUser.db.db.listCollections().toArray();
-    
+    const db = AdminUser.db?.db;
+    if (!db) {
+      throw new Error('Database connection not available');
+    }
+
+    const collections = await db.listCollections().toArray();
+
     for (const collection of collections) {
-      await AdminUser.db.db.dropCollection(collection.name);
+      await db.dropCollection(collection.name);
     }
 
     logger.info('Database cleaned successfully');
@@ -122,11 +127,16 @@ export async function validateDatabase(): Promise<void> {
     logger.info('Validating database schema and indexes...');
 
     // Validate collections exist
-    const collections = await AdminUser.db.db.listCollections().toArray();
+    const db = AdminUser.db?.db;
+    if (!db) {
+      throw new Error('Database connection not available');
+    }
+
+    const collections = await db.listCollections().toArray();
     const collectionNames = collections.map(c => c.name);
 
     const expectedCollections = ['adminusers', 'messages', 'servicestatuses'];
-    
+
     for (const expectedCollection of expectedCollections) {
       if (!collectionNames.includes(expectedCollection)) {
         logger.warn(`Expected collection '${expectedCollection}' not found`);
@@ -149,7 +159,12 @@ export async function validateDatabase(): Promise<void> {
 async function validateIndexes(): Promise<void> {
   try {
     // Check AdminUser indexes
-    const adminIndexes = await AdminUser.collection.getIndexes();
+    const collection = AdminUser.collection;
+    if (!collection) {
+      throw new Error('AdminUser collection not available');
+    }
+
+    const adminIndexes = await collection.getIndexes();
     logger.debug('AdminUser indexes:', adminIndexes);
 
     // Add more index validations as needed

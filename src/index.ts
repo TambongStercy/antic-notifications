@@ -2,9 +2,12 @@ import { config } from '@/config/environment';
 import NotificationService from '@/services/NotificationService';
 import buildApp from '@/api/server';
 import logger from '@/utils/logger';
-import WebSocketService from '@/services/WebSocketServer';
+import { GlobalErrorSuppressor } from '@/utils/globalErrorSuppressor';
 
 async function main() {
+    // Initialize global error suppressor to reduce third-party library noise
+    GlobalErrorSuppressor.init();
+    
     const service = new NotificationService();
     await service.init();
 
@@ -18,8 +21,6 @@ async function main() {
         logger.info(`Admin login: POST http://localhost:${config.port}/api/admin/login`);
     });
 
-    // Start WebSocket server for real-time updates
-    new WebSocketService(service).start();
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {

@@ -24,7 +24,7 @@ interface HeaderProps {
     sidebarWidth?: number
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true, sidebarWidth = 0 }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) => {
     const { logout } = useAuth()
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
 
@@ -46,11 +46,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true, sid
             position="fixed"
             sx={{
                 zIndex: (theme) => theme.zIndex.drawer + 1,
-                background: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)',
+                background: 'linear-gradient(135deg, #1976D2 0%, #42A5F5 100%)',
                 backdropFilter: 'blur(10px)',
                 borderBottom: 'none',
                 borderRadius: 0, // Remove any border radius
-                boxShadow: '0 2px 20px rgba(46, 125, 50, 0.2)',
+                boxShadow: '0 2px 20px rgba(25, 118, 210, 0.2)',
                 height: '72px',
                 '& .MuiToolbar-root': {
                     minHeight: '72px !important',
@@ -130,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true, sid
                         fontWeight: 600,
                         fontSize: '0.75rem',
                         '& .MuiChip-icon': {
-                            color: '#4CAF50',
+                            color: '#42A5F5',
                         },
                     }}
                 />

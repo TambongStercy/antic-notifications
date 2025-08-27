@@ -23,13 +23,10 @@ import {
     DialogActions,
     TextField,
     Tab,
-    Tabs,
-    Divider
+    Tabs
 } from '@mui/material';
 import {
     ExpandMore as ExpandMoreIcon,
-    Code as CodeIcon,
-    Security as SecurityIcon,
     Send as SendIcon,
     ContentCopy as CopyIcon
 } from '@mui/icons-material';
@@ -64,7 +61,7 @@ const ApiDocumentation: React.FC = () => {
     const [testRecipient, setTestRecipient] = useState('');
     const [testMessage, setTestMessage] = useState('');
 
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
@@ -97,6 +94,56 @@ const ApiDocumentation: React.FC = () => {
             toast.error('Network error occurred');
         }
         setTestDialogOpen(false);
+    };
+
+    const testTelegramAPI = async () => {
+        try {
+            const response = await fetch('/api/notifications/telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': testApiKey
+                },
+                body: JSON.stringify({
+                    recipient: testRecipient,
+                    message: testMessage
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                toast.success('Telegram message sent successfully!');
+            } else {
+                toast.error(data.error?.message || 'Failed to send Telegram message');
+            }
+        } catch (error) {
+            toast.error('Network error occurred');
+        }
+    };
+
+    const testMattermostAPI = async () => {
+        try {
+            const response = await fetch('/api/notifications/mattermost', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': testApiKey
+                },
+                body: JSON.stringify({
+                    recipient: testRecipient,
+                    message: testMessage
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                toast.success('Mattermost message sent successfully!');
+            } else {
+                toast.error(data.error?.message || 'Failed to send Mattermost message');
+            }
+        } catch (error) {
+            toast.error('Network error occurred');
+        }
     };
 
     const codeExamples = {
@@ -175,6 +222,44 @@ data = {
 response = requests.post(url, headers=headers, json=data)
 result = response.json()
 print(result)`
+        },
+        mattermost: {
+            curl: `curl -X POST https://your-domain.com/api/notifications/mattermost \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ak_your_api_key_here" \\
+  -d '{
+    "recipient": "4xp9fdt7pbgium38k0k6w95oa4",
+    "message": "Hello from ANTIC Notification Service!"
+  }'`,
+            javascript: `const response = await fetch('https://your-domain.com/api/notifications/mattermost', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'ak_your_api_key_here'
+  },
+  body: JSON.stringify({
+    recipient: '4xp9fdt7pbgium38k0k6w95oa4',
+    message: 'Hello from ANTIC Notification Service!'
+  })
+});
+
+const result = await response.json();
+console.log(result);`,
+            python: `import requests
+
+url = "https://your-domain.com/api/notifications/mattermost"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "ak_your_api_key_here"
+}
+data = {
+    "recipient": "4xp9fdt7pbgium38k0k6w95oa4",
+    "message": "Hello from ANTIC Notification Service!"
+}
+
+response = requests.post(url, headers=headers, json=data)
+result = response.json()
+print(result)`
         }
     };
 
@@ -185,6 +270,7 @@ print(result)`
                     <Tab label="Getting Started" />
                     <Tab label="WhatsApp API" />
                     <Tab label="Telegram API" />
+                    <Tab label="Mattermost API" />
                     <Tab label="Rate Limits" />
                     <Tab label="Test API" />
                 </Tabs>
@@ -452,6 +538,112 @@ print(result)`
 
             <TabPanel value={tabValue} index={3}>
                 <Typography variant="h5" gutterBottom fontWeight={600}>
+                    Mattermost API
+                </Typography>
+
+                <Card sx={{ mb: 3, borderRadius: '12px' }}>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Send Mattermost Message
+                        </Typography>
+                        <Chip label="POST" color="success" sx={{ mr: 1 }} />
+                        <Typography component="span" fontFamily="monospace">
+                            /notifications/mattermost
+                        </Typography>
+
+                        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }} fontWeight={600}>
+                            Required Permission:
+                        </Typography>
+                        <Chip label="mattermost:send" color="secondary" size="small" />
+
+                        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }} fontWeight={600}>
+                            Request Body:
+                        </Typography>
+                        <TableContainer component={Paper} sx={{ mt: 1 }}>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Field</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Required</TableCell>
+                                        <TableCell>Description</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell>recipient</TableCell>
+                                        <TableCell>string</TableCell>
+                                        <TableCell>Yes</TableCell>
+                                        <TableCell>Mattermost channel ID (26 alphanumeric characters)</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>message</TableCell>
+                                        <TableCell>string</TableCell>
+                                        <TableCell>Yes</TableCell>
+                                        <TableCell>Message text (supports Markdown, max 16383 characters)</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>metadata</TableCell>
+                                        <TableCell>object</TableCell>
+                                        <TableCell>No</TableCell>
+                                        <TableCell>Additional metadata for the message</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
+
+                <Alert severity="info" sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                        Finding Channel IDs
+                    </Typography>
+                    <Typography variant="body2" component="div">
+                        1. <strong>Web Interface:</strong> Open the channel in Mattermost web client and look at the URL<br/>
+                        2. <strong>API:</strong> Use GET /api/v4/users/me/teams/{'{team_id}'}/channels with your Personal Access Token<br/>
+                        3. <strong>Format:</strong> Channel IDs are exactly 26 alphanumeric characters (e.g., 4xp9fdt7pbgium38k0k6w95oa4)
+                    </Typography>
+                </Alert>
+
+                <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography fontWeight={600}>Code Examples</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <Tabs value={0}>
+                            <Tab label="cURL" />
+                            <Tab label="JavaScript" />
+                            <Tab label="Python" />
+                        </Tabs>
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="subtitle2" gutterBottom>cURL</Typography>
+                            <Box
+                                sx={{
+                                    backgroundColor: '#f5f5f5',
+                                    p: 2,
+                                    borderRadius: 1,
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.875rem',
+                                    whiteSpace: 'pre-wrap',
+                                    position: 'relative'
+                                }}
+                            >
+                                {codeExamples.mattermost.curl}
+                                <Button
+                                    size="small"
+                                    onClick={() => copyToClipboard(codeExamples.mattermost.curl)}
+                                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                                >
+                                    <CopyIcon fontSize="small" />
+                                </Button>
+                            </Box>
+                        </Box>
+                    </AccordionDetails>
+                </Accordion>
+            </TabPanel>
+
+            <TabPanel value={tabValue} index={4}>
+                <Typography variant="h5" gutterBottom fontWeight={600}>
                     Rate Limits
                 </Typography>
 
@@ -495,7 +687,7 @@ print(result)`
                 </Card>
             </TabPanel>
 
-            <TabPanel value={tabValue} index={4}>
+            <TabPanel value={tabValue} index={5}>
                 <Typography variant="h5" gutterBottom fontWeight={600}>
                     Test API
                 </Typography>
@@ -535,6 +727,24 @@ print(result)`
                         </Button>
                     </CardContent>
                 </Card>
+
+                <Card sx={{ mt: 2, borderRadius: '12px' }}>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Test Mattermost API
+                        </Typography>
+                        <Typography paragraph color="text.secondary">
+                            Send a Mattermost message using a channel ID (26 alphanumeric characters).
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            startIcon={<SendIcon />}
+                            onClick={() => setTestDialogOpen(true)}
+                        >
+                            Test Mattermost API
+                        </Button>
+                    </CardContent>
+                </Card>
             </TabPanel>
 
             {/* Test API Dialog */}
@@ -551,11 +761,12 @@ print(result)`
                     />
                     <TextField
                         fullWidth
-                        label="Recipient (Phone preferred)"
+                        label="Recipient"
                         value={testRecipient}
                         onChange={(e) => setTestRecipient(e.target.value)}
                         margin="normal"
-                        placeholder="+1234567890 or @username or chat_id"
+                        placeholder="+1234567890, @username, chat_id, or channel_id"
+                        helperText="Phone for WhatsApp/Telegram, @username/chat_id for Telegram, or 26-char channel ID for Mattermost"
                     />
                     <TextField
                         fullWidth
@@ -574,28 +785,50 @@ print(result)`
                         onClick={() => {
                             (async () => {
                                 try {
-                                    // Send to both WA and Telegram based on provided phone or identifier
                                     const isPhone = /^\+?[1-9]\d{1,14}$/.test(testRecipient);
+                                    const isChannelId = /^[a-z0-9]{26}$/.test(testRecipient);
+                                    const isUsername = testRecipient.startsWith('@');
+                                    const isChatId = /^\d+$/.test(testRecipient);
+
+                                    let testCount = 0;
+                                    const errors = [];
+
+                                    // Test WhatsApp for phone numbers
                                     if (isPhone) {
-                                        await testWhatsAppAPI();
+                                        try {
+                                            await testWhatsAppAPI();
+                                            testCount++;
+                                        } catch (err) {
+                                            errors.push('WhatsApp test failed');
+                                        }
                                     }
-                                    const response = await fetch('/api/notifications/telegram', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-API-Key': testApiKey
-                                        },
-                                        body: JSON.stringify({
-                                            recipient: testRecipient,
-                                            message: testMessage
-                                        })
-                                    });
-                                    const data = await response.json();
-                                    if (response.ok) {
-                                        toast.success('Telegram message sent successfully!');
-                                    } else {
-                                        toast.error(data.error?.message || 'Failed to send message');
+
+                                    // Test Telegram for phones, usernames, or chat IDs
+                                    if (isPhone || isUsername || isChatId) {
+                                        try {
+                                            await testTelegramAPI();
+                                            testCount++;
+                                        } catch (err) {
+                                            errors.push('Telegram test failed');
+                                        }
                                     }
+
+                                    // Test Mattermost for channel IDs
+                                    if (isChannelId) {
+                                        try {
+                                            await testMattermostAPI();
+                                            testCount++;
+                                        } catch (err) {
+                                            errors.push('Mattermost test failed');
+                                        }
+                                    }
+
+                                    if (testCount === 0) {
+                                        toast.error('Recipient format not recognized. Use +phone, @username, chat_id, or 26-char channel_id');
+                                    } else if (errors.length > 0) {
+                                        toast.error(`${testCount} test(s) completed, ${errors.length} failed`);
+                                    }
+
                                 } catch (err) {
                                     toast.error('Network error occurred');
                                 }

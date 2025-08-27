@@ -1,26 +1,56 @@
 import Joi from 'joi';
+import { sanitizePhoneNumber, validateWhatsAppPhoneNumber, validateTelegramPhoneNumber } from '@/utils/phoneNumber';
+
+// Custom Joi validators
+const whatsappRecipientValidator = Joi.string().custom((value, helpers) => {
+    const validation = validateWhatsAppPhoneNumber(value);
+    if (!validation.isValid) {
+        return helpers.error('whatsapp.invalid', { message: validation.error });
+    }
+    // Return sanitized value
+    return validation.formatted || validation.cleanNumber;
+}).messages({
+    'whatsapp.invalid': '{{#message}}'
+});
+
+const telegramRecipientValidator = Joi.string().custom((value, helpers) => {
+    const validation = validateTelegramPhoneNumber(value);
+    if (!validation.isValid) {
+        return helpers.error('telegram.invalid', { message: validation.error });
+    }
+    // Return sanitized value
+    return validation.formatted || validation.cleanNumber;
+}).messages({
+    'telegram.invalid': '{{#message}}'
+});
 
 // Notification schemas
 export const notificationRequestSchema = Joi.object({
     recipient: Joi.string().required().min(1).max(100).trim(),
-    message: Joi.string().required().min(1).max(4096),
+    message: Joi.string().required().min(1).trim().messages({
+        'string.empty': 'Message content is required',
+        'string.min': 'Message must not be empty',
+        'any.required': 'Message is required'
+    }),
     type: Joi.string().valid('text', 'media').optional(),
     metadata: Joi.object().optional(),
 });
 
 export const whatsappNotificationSchema = notificationRequestSchema.keys({
-    recipient: Joi.string().required().pattern(/^\+?[\d\s\-\(\)]+$/).messages({
-        'string.pattern.base': 'WhatsApp recipient must be a valid phone number'
+    recipient: whatsappRecipientValidator.required(),
+    message: Joi.string().required().min(1).max(65000).trim().messages({
+        'string.max': 'WhatsApp message cannot exceed 65,000 characters',
+        'string.empty': 'Message content is required',
+        'any.required': 'Message is required'
     }),
 });
 
 export const telegramNotificationSchema = notificationRequestSchema.keys({
-    recipient: Joi.alternatives().try(
-        Joi.string().pattern(/^\+?[1-9]\d{1,14}$/), // phone number E.164
-        Joi.string().pattern(/^@[a-zA-Z0-9_]{5,32}$/),
-        Joi.string().pattern(/^\d+$/)
-    ).required().messages({
-        'alternatives.match': 'Telegram recipient must be a phone number, chat ID (number) or @username'
+    recipient: telegramRecipientValidator.required(),
+    message: Joi.string().required().min(1).max(4096).trim().messages({
+        'string.max': 'Telegram message cannot exceed 4,096 characters',
+        'string.empty': 'Message content is required',
+        'any.required': 'Message is required'
     }),
 });
 

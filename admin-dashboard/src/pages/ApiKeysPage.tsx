@@ -75,18 +75,13 @@ interface UsageStats {
 }
 
 const PERMISSIONS = [
-    { value: 'whatsapp:send', label: 'WhatsApp Send', color: '#25D366' },
+    { value: 'whatsapp:send', label: 'WhatsApp Send', color: '#42A5F5' },
     { value: 'telegram:send', label: 'Telegram Send', color: '#0088CC' },
+    { value: 'mattermost:send', label: 'Mattermost Send', color: '#0072C6' },
     { value: 'messages:read', label: 'Messages Read', color: '#FF9800' },
     { value: 'status:read', label: 'Status Read', color: '#9C27B0' }
 ];
 
-const RATE_LIMIT_PRESETS = [
-    { label: 'Low (10/hour)', requests: 10, windowMs: 3600000 },
-    { label: 'Medium (100/hour)', requests: 100, windowMs: 3600000 },
-    { label: 'High (500/hour)', requests: 500, windowMs: 3600000 },
-    { label: 'Very High (1000/hour)', requests: 1000, windowMs: 3600000 }
-];
 
 const ApiKeysPage: React.FC = () => {
     const [tabValue, setTabValue] = useState(0);
@@ -399,7 +394,7 @@ const ApiKeysPage: React.FC = () => {
         return `${rateLimit.requests}/${hours}h`;
     };
 
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
@@ -412,7 +407,7 @@ const ApiKeysPage: React.FC = () => {
             {/* Header */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
                 <Box>
-                    <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#2E7D32' }}>
+                    <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#1976D2' }}>
                         API Keys
                     </Typography>
                     <Typography variant="body1" color="text.secondary">
@@ -456,12 +451,12 @@ const ApiKeysPage: React.FC = () => {
                                 <Card sx={{ borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.08)' }}>
                                     <CardContent>
                                         <Box display="flex" alignItems="center" mb={1}>
-                                            <KeyIcon sx={{ color: '#2E7D32', mr: 1 }} />
+                                            <KeyIcon sx={{ color: '#1976D2', mr: 1 }} />
                                             <Typography variant="h6" fontWeight={600}>
                                                 Total Keys
                                             </Typography>
                                         </Box>
-                                        <Typography variant="h3" fontWeight={700} color="#2E7D32">
+                                        <Typography variant="h3" fontWeight={700} color="#1976D2">
                                             {stats.totalKeys}
                                         </Typography>
                                     </CardContent>
@@ -471,12 +466,12 @@ const ApiKeysPage: React.FC = () => {
                                 <Card sx={{ borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.08)' }}>
                                     <CardContent>
                                         <Box display="flex" alignItems="center" mb={1}>
-                                            <SecurityIcon sx={{ color: '#4CAF50', mr: 1 }} />
+                                            <SecurityIcon sx={{ color: '#42A5F5', mr: 1 }} />
                                             <Typography variant="h6" fontWeight={600}>
                                                 Active Keys
                                             </Typography>
                                         </Box>
-                                        <Typography variant="h3" fontWeight={700} color="#4CAF50">
+                                        <Typography variant="h3" fontWeight={700} color="#42A5F5">
                                             {stats.activeKeys}
                                         </Typography>
                                     </CardContent>
@@ -860,7 +855,7 @@ const ApiKeysPage: React.FC = () => {
                                         }}
                                     />
                                     <Legend wrapperStyle={{ paddingTop: 8 }} />
-                                    <Bar dataKey="total" name="Total messages" fill="#2e7d32" radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="total" name="Total messages" fill="#1976d2" radius={[6, 6, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}

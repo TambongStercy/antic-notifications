@@ -49,9 +49,8 @@ const MessagesPage: React.FC = () => {
         message: '',
         metadata: {}
     })
-    const [sendService, setSendService] = useState<'whatsapp' | 'telegram'>('whatsapp')
+    const [sendService, setSendService] = useState<'whatsapp' | 'telegram' | 'mattermost'>('whatsapp')
     const [sendingMessage, setSendingMessage] = useState(false)
-    const [retryingMessage, setRetryingMessage] = useState<string | null>(null)
     const [rateLimitSeconds, setRateLimitSeconds] = useState<number | null>(null)
 
     useEffect(() => {
@@ -78,15 +77,12 @@ const MessagesPage: React.FC = () => {
     }
 
     const handleRetry = async (messageId: string) => {
-        setRetryingMessage(messageId)
         try {
             await messagesAPI.retryMessage(messageId)
             toast.success('Message queued for retry')
             fetchMessages()
         } catch (error) {
             toast.error('Failed to retry message')
-        } finally {
-            setRetryingMessage(null)
         }
     }
 
@@ -100,8 +96,10 @@ const MessagesPage: React.FC = () => {
         try {
             if (sendService === 'whatsapp') {
                 await messagesAPI.sendWhatsApp(newMessage)
-            } else {
+            } else if (sendService === 'telegram') {
                 await messagesAPI.sendTelegram(newMessage)
+            } else {
+                await messagesAPI.sendMattermost(newMessage)
             }
             toast.success(`${sendService} message sent successfully`)
             setSendDialogOpen(false)
@@ -217,6 +215,7 @@ const MessagesPage: React.FC = () => {
                                     <MenuItem value="">All</MenuItem>
                                     <MenuItem value="whatsapp">WhatsApp</MenuItem>
                                     <MenuItem value="telegram">Telegram</MenuItem>
+                                    <MenuItem value="mattermost">Mattermost</MenuItem>
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -280,7 +279,7 @@ const MessagesPage: React.FC = () => {
                                     <TableCell>
                                         <Chip
                                             label={message.service}
-                                            color={message.service === 'whatsapp' ? 'success' : 'primary'}
+                                            color={message.service === 'whatsapp' ? 'success' : message.service === 'telegram' ? 'primary' : 'secondary'}
                                             size="small"
                                         />
                                     </TableCell>
@@ -429,10 +428,11 @@ const MessagesPage: React.FC = () => {
                                 <Select
                                     value={sendService}
                                     label="Service"
-                                    onChange={(e) => setSendService(e.target.value as 'whatsapp' | 'telegram')}
+                                    onChange={(e) => setSendService(e.target.value as 'whatsapp' | 'telegram' | 'mattermost')}
                                 >
                                     <MenuItem value="whatsapp">WhatsApp</MenuItem>
                                     <MenuItem value="telegram">Telegram</MenuItem>
+                                    <MenuItem value="mattermost">Mattermost</MenuItem>
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -442,11 +442,17 @@ const MessagesPage: React.FC = () => {
                                 label="Recipient"
                                 value={newMessage.recipient}
                                 onChange={(e) => setNewMessage({ ...newMessage, recipient: e.target.value })}
-                                placeholder={sendService === 'whatsapp' ? '+237123456789' : '+237123456789 (preferred)'}
+                                placeholder={
+                                    sendService === 'whatsapp' ? '+237123456789' :
+                                    sendService === 'telegram' ? '+237123456789 (preferred)' :
+                                    '4xp9fdt7pbgium38k0k6w95oa4'
+                                }
                                 helperText={
                                     sendService === 'whatsapp'
                                         ? 'Enter phone number with country code'
-                                        : 'Enter phone number (preferred). @username or chat ID also supported.'
+                                        : sendService === 'telegram'
+                                        ? 'Enter phone number (preferred). @username or chat ID also supported.'
+                                        : 'Enter Mattermost channel ID (26 alphanumeric characters)'
                                 }
                             />
                         </Grid>

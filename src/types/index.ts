@@ -6,19 +6,23 @@ export interface NotificationRequest {
 }
 
 export interface ServiceStatus {
-  service: 'whatsapp' | 'telegram';
-  status: 'connected' | 'disconnected' | 'authenticating';
+  service: 'whatsapp' | 'telegram' | 'mattermost';
+  status: 'connected' | 'disconnected';
   lastUpdated: Date;
   metadata?: {
     qrCode?: string;
     botToken?: string;
+    webhookUrl?: string;
+    accessToken?: string;
+    serverUrl?: string;
     connectionInfo?: any;
+    credentials?: any;
   };
 }
 
 export interface MessageRecord {
   id: string;
-  service: 'whatsapp' | 'telegram';
+  service: 'whatsapp' | 'telegram' | 'mattermost';
   recipient: string;
   message: string;
   status: 'pending' | 'sent' | 'failed';
@@ -65,8 +69,9 @@ export interface HealthCheckResponse {
   timestamp: string;
   services: {
     database: 'connected' | 'disconnected';
-    whatsapp: 'connected' | 'disconnected' | 'authenticating' | 'not_configured';
+    whatsapp: 'connected' | 'disconnected' | 'not_configured';
     telegram: 'connected' | 'disconnected' | 'not_configured';
+    mattermost: 'connected' | 'disconnected' | 'not_configured';
   };
   uptime: number;
   version: string;
@@ -89,9 +94,9 @@ export interface PaginatedResponse<T> {
   };
 }
 
-export type ServiceType = 'whatsapp' | 'telegram';
+export type ServiceType = 'whatsapp' | 'telegram' | 'mattermost';
 export type MessageStatus = 'pending' | 'sent' | 'failed';
-export type ConnectionStatus = 'connected' | 'disconnected' | 'authenticating';
+export type ConnectionStatus = 'connected' | 'disconnected';
 
 // WebSocket event types
 export interface WebSocketEvents {

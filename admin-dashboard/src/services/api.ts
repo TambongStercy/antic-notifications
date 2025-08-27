@@ -165,6 +165,36 @@ export const servicesAPI = {
     provideTelegramPassword: async (password: string): Promise<void> => {
         await api.post('/api/admin/telegram/provide-password', { password })
     },
+
+    // Mattermost API methods
+    setMattermostConfig: async (serverUrl: string, accessToken: string): Promise<void> => {
+        await api.post('/api/admin/mattermost/config', { serverUrl, accessToken })
+    },
+
+    connectMattermost: async (): Promise<void> => {
+        await api.post('/api/admin/mattermost/connect')
+    },
+
+    disconnectMattermost: async (): Promise<void> => {
+        await api.post('/api/admin/mattermost/disconnect')
+    },
+
+    getMattermostStatus: async (): Promise<{
+        configured: boolean
+        connected: boolean
+        serverUrl: string | null
+        hasAccessToken: boolean
+        needsSetup?: boolean
+        timestamp: string
+        lastUpdated?: string
+    }> => {
+        const response = await api.get('/api/admin/mattermost/status')
+        return response.data
+    },
+
+    clearMattermostConfig: async (): Promise<void> => {
+        await api.delete('/api/admin/mattermost/config')
+    },
 }
 
 // Messages API
@@ -198,6 +228,11 @@ export const messagesAPI = {
 
     sendTelegram: async (data: NotificationRequest): Promise<{ messageId: string }> => {
         const response: AxiosResponse<{ messageId: string }> = await api.post('/api/notifications/telegram', data)
+        return response.data
+    },
+
+    sendMattermost: async (data: NotificationRequest): Promise<{ messageId: string }> => {
+        const response: AxiosResponse<{ messageId: string }> = await api.post('/api/notifications/mattermost', data)
         return response.data
     },
 }
