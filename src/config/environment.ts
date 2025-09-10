@@ -8,6 +8,7 @@ dotenv.config();
 const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
+  HTTPS_PORT: Joi.number().default(3001),
 
   // Database
   MONGODB_URI: Joi.string().required(),
@@ -40,7 +41,7 @@ const envSchema = Joi.object({
   BCRYPT_ROUNDS: Joi.number().default(12),
   RATE_LIMIT_WINDOW_MS: Joi.number().default(900000),
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
-  
+
   // API Key
   MASTER_API_KEY: Joi.string().allow('').optional(),
 
@@ -51,6 +52,11 @@ const envSchema = Joi.object({
   // Logging
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
   LOG_FILE: Joi.string().default('logs/app.log'),
+
+  // SSL/TLS
+  SSL_CERT_PATH: Joi.string().optional(),
+  SSL_KEY_PATH: Joi.string().optional(),
+  SSL_INTERMEDIATE_PATH: Joi.string().optional(),
 
 }).unknown();
 
@@ -64,6 +70,7 @@ if (error) {
 export const config = {
   env: envVars.NODE_ENV,
   port: envVars.PORT,
+  httpsPort: envVars.HTTPS_PORT,
 
   database: {
     uri: envVars.NODE_ENV === 'test' ? envVars.MONGODB_TEST_URI : envVars.MONGODB_URI,
@@ -103,13 +110,19 @@ export const config = {
   },
 
   cors: {
-    origin: envVars.CORS_ORIGIN,
+    origin: envVars.CORS_ORIGIN.split(',').map((origin: string) => origin.trim()),
     credentials: envVars.CORS_CREDENTIALS
   },
 
   logging: {
     level: envVars.LOG_LEVEL,
     file: envVars.LOG_FILE
+  },
+
+  ssl: {
+    certPath: envVars.SSL_CERT_PATH,
+    keyPath: envVars.SSL_KEY_PATH,
+    intermediatePath: envVars.SSL_INTERMEDIATE_PATH
   },
 
 };

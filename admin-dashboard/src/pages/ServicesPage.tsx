@@ -170,7 +170,7 @@ const ServicesPage: React.FC = () => {
                 try {
                     const qrData = await servicesAPI.getWhatsAppQR()
                     console.log('QR code data length:', qrData.qrCode?.length);
-                    if (qrData.qrCode && qrData.qrCode.length > 0 && qrData.qrCode.length < 4000) {
+                    if (qrData.qrCode && qrData.qrCode.length > 0) {
                         setQrCode(qrData.qrCode)
                         setQrDialogOpen(true)
                         toast.success('QR code is ready! Please scan with your phone.')
@@ -267,11 +267,34 @@ const ServicesPage: React.FC = () => {
     const handleTelegramConnect = async () => {
         setActionLoading('telegram-connect')
         try {
-            await servicesAPI.connectTelegram()
-            toast.success('Telegram connected')
+            const response = await servicesAPI.connectTelegram()
+            
+            // Check if authentication steps are needed
+            if (response.status === 'auth_in_progress') {
+                toast('Authentication in progress. Please check for SMS code.', { icon: 'ℹ️' })
+                setCodeDialogOpen(true) // Show OTP modal
+            } else if (response.status === 'code_required') {
+                toast('Please enter the SMS verification code', { icon: 'ℹ️' })
+                setCodeDialogOpen(true)
+            } else if (response.status === 'password_required') {
+                toast('Please enter your 2FA password', { icon: 'ℹ️' })
+                setPasswordDialogOpen(true)
+            } else if (response.success) {
+                toast.success('Telegram connected successfully')
+            }
+            
             fetchServices()
-        } catch (error) {
-            toast.error('Failed to connect Telegram')
+        } catch (error: any) {
+            // Check if error response contains authentication info
+            if (error.response?.data?.status === 'code_required') {
+                toast('Please enter the SMS verification code', { icon: 'ℹ️' })
+                setCodeDialogOpen(true)
+            } else if (error.response?.data?.status === 'password_required') {
+                toast('Please enter your 2FA password', { icon: 'ℹ️' })
+                setPasswordDialogOpen(true)
+            } else {
+                toast.error('Failed to connect Telegram')
+            }
         } finally {
             setActionLoading(null)
         }
@@ -294,12 +317,12 @@ const ServicesPage: React.FC = () => {
         try {
             const qrData = await servicesAPI.getWhatsAppQR()
             console.log('Manual QR code fetch - data length:', qrData.qrCode?.length);
-            if (qrData.qrCode && qrData.qrCode.length > 0 && qrData.qrCode.length < 4000) {
+            if (qrData.qrCode && qrData.qrCode.length > 0) {
                 setQrCode(qrData.qrCode)
                 setQrDialogOpen(true)
             } else {
-                console.error('Invalid QR code data from manual fetch:', qrData.qrCode?.length);
-                toast.error('Received invalid QR code data. The QR code may be too large to display.');
+                console.error('No QR code data received:', qrData.qrCode?.length);
+                toast.error('No QR code available. Please try connecting again.');
             }
         } catch (error) {
             console.error('QR code fetch error:', error);
@@ -772,20 +795,23 @@ const ServicesPage: React.FC = () => {
                                     <Box p={2} bgcolor="white" borderRadius={1}>
                                         {(() => {
                                             try {
-                                                // Validate QR code data length (QR codes have a max capacity of ~4296 characters)
-                                                if (qrCode.length > 4000) {
+                                                // Check if QR code is a base64 image data URL
+                                                if (qrCode.startsWith('data:image/')) {
                                                     return (
-                                                        <Alert severity="error">
-                                                            QR code data is too long to display. Please try refreshing.
-                                                        </Alert>
+                                                        <img 
+                                                            src={qrCode} 
+                                                            alt="WhatsApp QR Code" 
+                                                            style={{ width: 256, height: 256 }}
+                                                        />
                                                     );
                                                 }
+                                                // Fallback for text-based QR codes
                                                 return <QRCode value={qrCode} size={256} level="M" />;
                                             } catch (error) {
                                                 console.error('QR Code error:', error);
                                                 return (
                                                     <Alert severity="error">
-                                                        Failed to generate QR code. Please try refreshing.
+                                                        Failed to display QR code. Please try refreshing.
                                                     </Alert>
                                                 );
                                             }

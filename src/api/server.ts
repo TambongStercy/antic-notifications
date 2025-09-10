@@ -23,6 +23,7 @@ export function buildApp(service: NotificationService) {
     app.use(helmet());
     app.use(cors({ origin: config.cors.origin, credentials: config.cors.credentials }));
     app.use(express.json());
+    app.use(express.urlencoded({ extended: true })); // Support form-data
     app.use(httpLogger);
     app.use(apiRateLimiter);
 

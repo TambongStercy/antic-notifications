@@ -1,9 +1,12 @@
 import makeWASocket, {
     useMultiFileAuthState,
     WASocket,
-    AuthenticationState
+    AuthenticationState,
+    DisconnectReason
 } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
 import QRCode from 'qrcode';
+import P from 'pino';
 import { ServiceStatusRepository } from '@/database/repositories/ServiceStatusRepository';
 import { MessageRepository } from '@/database/repositories/MessageRepository';
 import { ServiceType } from '@/types';
@@ -25,6 +28,8 @@ export class BaileysWhatsAppProvider {
     private connected = false;
     private authState: AuthenticationState | null = null;
     private pollingInterval: NodeJS.Timeout | null = null;
+    private lastRestartTime = 0;
+    private restartCooldownMs = 60000; // 1 minute cooldown between restarts
 
     constructor(
         deps?: {
@@ -69,39 +74,26 @@ export class BaileysWhatsAppProvider {
 
             logger.info('Auth state loaded, creds available:', !!state.creds);
 
-            // Create the socket with minimal configuration
+            // Create the socket with improved configuration
             this.socket = makeWASocket({
                 auth: state,
                 printQRInTerminal: false,
-                connectTimeoutMs: 60000,
-                defaultQueryTimeoutMs: 60000,
-                qrTimeout: 40000,
-                logger: {
-                    level: 'error',
-                    child: () => ({
-                        level: 'error',
-                        trace: () => { },
-                        debug: () => { },
-                        info: () => { },
-                        warn: () => { },
-                        error: () => { },
-                    } as any),
-                    trace: () => { },
-                    debug: () => { },
-                    info: () => { },
-                    warn: () => { },
-                    error: (msg: any) => logger.error('Baileys:', msg),
-                },
-                retryRequestDelayMs: 250,
-                maxMsgRetryCount: 5,
+                connectTimeoutMs: 90000, // Increased for QR scanning
+                defaultQueryTimeoutMs: 90000,
+                qrTimeout: 60000, // Increased QR timeout
+                logger: P({ level: 'silent' }),
+                retryRequestDelayMs: 2000, // Faster retries during auth
+                maxMsgRetryCount: 3, // More retries for auth process
                 getMessage: async () => undefined,
                 syncFullHistory: false,
                 markOnlineOnConnect: false,
-                browser: ['WhatsApp Web', 'Chrome', '4.0.0'],
+                browser: ['Antic Notification', 'Chrome', '1.0.0'],
                 mobile: false,
                 emitOwnEvents: true,
                 fireInitQueries: true,
                 generateHighQualityLinkPreview: false,
+                shouldIgnoreJid: () => false,
+                keepAliveIntervalMs: 30000,
             });
 
             // Set up basic event handlers for QR and connection status
@@ -110,8 +102,8 @@ export class BaileysWhatsAppProvider {
             this.initialized = true;
             logger.info('Baileys WhatsApp client initialized successfully');
 
-            // Start polling for connection status
-            this.startPolling();
+            // Polling disabled - using proper event handlers instead
+            // this.startPolling();
 
         } catch (error) {
             logger.error('Failed to initialize Baileys WhatsApp client:', error);
@@ -132,16 +124,78 @@ export class BaileysWhatsAppProvider {
     private setupBasicEventHandlers(saveCreds: () => Promise<void>): void {
         if (!this.socket) return;
 
-        // Handle QR code generation
+        // Handle connection updates including QR code and connection status
         this.socket.ev.on('connection.update', async (update) => {
-            const { qr } = update;
+            const { connection, lastDisconnect, qr, isNewLogin, isOnline, receivedPendingNotifications } = update;
+
+            logger.info('WhatsApp connection update:', {
+                connection,
+                hasQR: !!qr,
+                isNewLogin,
+                isOnline,
+                receivedPendingNotifications,
+                lastDisconnect: lastDisconnect ? {
+                    statusCode: (lastDisconnect.error as Boom)?.output?.statusCode,
+                    reason: this.getDisconnectReasonName((lastDisconnect.error as Boom)?.output?.statusCode)
+                } : null
+            });
+
+            // Handle QR code generation
             if (qr) {
                 try {
-                    const qrString = await QRCode.toString(qr, { type: 'terminal' });
+                    const qrString = await QRCode.toDataURL(qr);
                     await this.statusRepository.setWhatsAppQRCode(qrString);
                     logger.info('WhatsApp QR code generated and stored');
                 } catch (error) {
                     logger.error('Failed to generate QR code:', error);
+                }
+            }
+
+            // Handle connection status changes
+            if (connection === 'open') {
+                logger.info('WhatsApp connection established successfully');
+                this.connected = true;
+                await this.statusRepository.markAsConnected('whatsapp');
+                await this.statusRepository.clearWhatsAppQRCode();
+            } else if (connection === 'close') {
+                this.connected = false;
+                await this.statusRepository.markAsDisconnected('whatsapp');
+
+                const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+                logger.info(`WhatsApp connection closed due to ${this.getDisconnectReasonName(statusCode)}, reconnecting: ${shouldReconnect}`);
+
+                // Handle different disconnect reasons according to Baileys best practices
+                if (shouldReconnect) {
+                    // Special handling for restart required during QR scanning
+                    if (statusCode === DisconnectReason.restartRequired) {
+                        logger.info('Restart required - likely after QR scan, reconnecting immediately');
+                        // Reconnect immediately for restart required errors during auth
+                        setTimeout(() => {
+                            if (!this.connected) {
+                                logger.info('Attempting immediate reconnection after restart required');
+                                this.reconnect().catch(err =>
+                                    logger.error('Auto-reconnect failed:', err)
+                                );
+                            }
+                        }, 2000); // Just 2 seconds delay
+                    } else {
+                        // Implement exponential backoff for other errors
+                        const delay = this.getReconnectDelay(statusCode);
+                        logger.info(`Scheduling reconnection in ${delay / 1000} seconds`);
+
+                        setTimeout(() => {
+                            if (!this.connected) {
+                                logger.info('Attempting automatic reconnection');
+                                this.reconnect().catch(err =>
+                                    logger.error('Auto-reconnect failed:', err)
+                                );
+                            }
+                        }, delay);
+                    }
+                } else {
+                    logger.warn('Not reconnecting due to logout or permanent error');
                 }
             }
         });
@@ -253,7 +307,7 @@ export class BaileysWhatsAppProvider {
         if (!recipient || typeof recipient !== 'string') {
             return { success: false, errorMessage: 'Recipient phone number is required' };
         }
-        
+
         if (!message || typeof message !== 'string' || message.trim().length === 0) {
             return { success: false, errorMessage: 'Message content is required' };
         }
@@ -294,23 +348,23 @@ export class BaileysWhatsAppProvider {
 
                 // Send message using Baileys with timeout
                 logger.info(`Sending WhatsApp message to ${jid}`);
-                const sendPromise = this.socket.sendMessage(jid, { 
-                    text: message.trim() 
+                const sendPromise = this.socket.sendMessage(jid, {
+                    text: message.trim()
                 });
-                
+
                 // Add timeout to prevent hanging
-                const timeoutPromise = new Promise<never>((_, reject) => 
+                const timeoutPromise = new Promise<never>((_, reject) =>
                     setTimeout(() => reject(new Error('Message send timeout after 30 seconds')), 30000)
                 );
-                
+
                 const sentMessage = await Promise.race([sendPromise, timeoutPromise]);
 
                 if (sentMessage && sentMessage.key) {
                     await this.messageRepository.markAsSent(msg.id, sentMessage.key.id || 'unknown');
                     logger.info(`WhatsApp message sent successfully to ${sanitizedRecipient} with ID: ${sentMessage.key.id}`);
-                    return { 
-                        success: true, 
-                        externalMessageId: sentMessage.key.id 
+                    return {
+                        success: true,
+                        externalMessageId: sentMessage.key.id
                     };
                 } else {
                     throw new Error('Message sent but no response received from WhatsApp');
@@ -318,10 +372,10 @@ export class BaileysWhatsAppProvider {
 
             } catch (sendError) {
                 let errorMessage = 'Failed to send WhatsApp message';
-                
+
                 if (sendError instanceof Error) {
                     errorMessage = sendError.message;
-                    
+
                     // Handle specific WhatsApp errors
                     if (errorMessage.includes('not-authorized')) {
                         errorMessage = 'WhatsApp session expired. Please re-authenticate.';
@@ -347,7 +401,7 @@ export class BaileysWhatsAppProvider {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
-            logger.error('Baileys WhatsApp send failed (database error):', { 
+            logger.error('Baileys WhatsApp send failed (database error):', {
                 error: errorMessage,
                 recipient: phoneValidation.formatted || recipient
             });
@@ -418,6 +472,16 @@ export class BaileysWhatsAppProvider {
     }
 
     public async cleanRestart(): Promise<void> {
+        const now = Date.now();
+
+        // Prevent excessive restarts
+        if (now - this.lastRestartTime < this.restartCooldownMs) {
+            const remainingCooldown = this.restartCooldownMs - (now - this.lastRestartTime);
+            logger.warn(`Clean restart blocked by cooldown. ${Math.ceil(remainingCooldown / 1000)}s remaining`);
+            return;
+        }
+
+        this.lastRestartTime = now;
         logger.info('Performing clean restart of Baileys WhatsApp client');
         await this.forceReset();
 
@@ -514,6 +578,45 @@ export class BaileysWhatsAppProvider {
             socketExists: !!this.socket,
             authStateExists: !!this.authState,
         };
+    }
+
+    private getDisconnectReasonName(statusCode?: number): string {
+        if (!statusCode) return 'Unknown';
+
+        const reasons: Record<number, string> = {
+            401: 'Logged Out',
+            403: 'Forbidden',
+            408: 'Timed Out / Connection Lost',
+            411: 'Multidevice Mismatch',
+            428: 'Connection Closed',
+            440: 'Connection Replaced',
+            500: 'Bad Session',
+            503: 'Unavailable Service',
+            515: 'Restart Required'
+        };
+
+        return reasons[statusCode] || `Unknown (${statusCode})`;
+    }
+
+    private getReconnectDelay(statusCode?: number): number {
+        if (!statusCode) return 30000; // 30 seconds default
+
+        // Implement exponential backoff based on error type
+        switch (statusCode) {
+            case DisconnectReason.restartRequired: // 515 - restart required, wait longer
+                return 300000; // 5 minutes
+            case DisconnectReason.connectionLost:
+            case DisconnectReason.connectionClosed:
+                return 10000; // 10 seconds
+            case DisconnectReason.timedOut:
+                return 30000; // 30 seconds
+            case DisconnectReason.badSession:
+                return 60000; // 1 minute
+            case DisconnectReason.unavailableService:
+                return 120000; // 2 minutes
+            default:
+                return 30000; // 30 seconds default
+        }
     }
 
     public async handlePostScanConnection(): Promise<void> {

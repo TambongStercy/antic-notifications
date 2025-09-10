@@ -328,48 +328,6 @@ const LoginPage: React.FC = () => {
                             </Button>
                         </Box>
 
-                        <Box
-                            sx={{
-                                mt: 3,
-                                p: 2.5,
-                                background: 'linear-gradient(145deg, rgba(27, 94, 32, 0.08), rgba(198, 40, 40, 0.04), rgba(245, 124, 0, 0.04))',
-                                border: '2px solid transparent',
-                                borderRadius: '16px',
-                                position: 'relative',
-                                '&::before': {
-                                    content: '""',
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    borderRadius: '16px',
-                                    padding: '2px',
-                                    background: 'linear-gradient(45deg, rgba(27, 94, 32, 0.4), rgba(198, 40, 40, 0.4), rgba(245, 124, 0, 0.4))',
-                                    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                    maskComposite: 'xor',
-                                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                    WebkitMaskComposite: 'xor',
-                                },
-                            }}
-                        >
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    color: '#424242',
-                                    display: 'block',
-                                    textAlign: 'center',
-                                    fontWeight: 600,
-                                    position: 'relative',
-                                    zIndex: 1,
-                                }}
-                            >
-                                <strong>Default Credentials:</strong><br />
-                                <Box component="span" sx={{ color: '#0D47A1', fontWeight: 700 }}>admin</Box>
-                                {' | '}
-                                <Box component="span" sx={{ color: '#C62828', fontWeight: 700 }}>admin123</Box>
-                            </Typography>
-                        </Box>
                     </CardContent>
                 </Card>
             </Container>

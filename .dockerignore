@@ -91,3 +91,12 @@ docker-compose*.yml
 # Development files
 .env.example
 *.example
+
+# TLS certificates (mounted as volumes)
+tls/
+*.pem
+*.key
+*.crt
+
+# Additional temporary files
+nul

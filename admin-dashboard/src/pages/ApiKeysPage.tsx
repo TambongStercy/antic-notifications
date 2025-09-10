@@ -374,6 +374,48 @@ const ApiKeysPage: React.FC = () => {
         setSelectedApiKey(null);
     };
 
+    const handleCopyApiKey = async (apiKey: string) => {
+        // Check if Clipboard API is available and we're in a secure context
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(apiKey);
+                toast.success('API key copied to clipboard');
+                return;
+            } catch (error) {
+                console.warn('Clipboard API failed, falling back to legacy method:', error);
+            }
+        }
+
+        // Fallback method for all browsers and insecure contexts
+        try {
+            const textArea = document.createElement('textarea');
+            textArea.value = apiKey;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            textArea.style.opacity = '0';
+            textArea.setAttribute('readonly', '');
+            document.body.appendChild(textArea);
+            
+            textArea.focus();
+            textArea.select();
+            textArea.setSelectionRange(0, 99999); // For mobile devices
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+                toast.success('API key copied to clipboard');
+            } else {
+                throw new Error('Copy command failed');
+            }
+        } catch (fallbackError) {
+            console.error('All copy methods failed:', fallbackError);
+            // Show the API key in a prompt as last resort
+            window.prompt('Copy the API key manually:', apiKey);
+        }
+    };
+
     const openEditDialog = (apiKey: ApiKey) => {
         setSelectedApiKey(apiKey);
         setFormData({
@@ -539,9 +581,19 @@ const ApiKeysPage: React.FC = () => {
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Typography variant="body2" fontFamily="monospace">
-                                                        {apiKey.key}
-                                                    </Typography>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Typography variant="body2" fontFamily="monospace" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {apiKey.key}
+                                                        </Typography>
+                                                        <Tooltip title="Copy API Key">
+                                                            <IconButton 
+                                                                size="small" 
+                                                                onClick={() => handleCopyApiKey(apiKey.key)}
+                                                            >
+                                                                <CopyIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Box display="flex" flexWrap="wrap" gap={0.5}>

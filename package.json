@@ -4,7 +4,7 @@
   "description": "A notification service for sending WhatsApp and Telegram messages via API",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules -r tsconfig-paths/register src/index.ts",
     "start:dev": "cross-env NODE_ENV=development ts-node --transpile-only -r tsconfig-paths/register src/index.ts",
@@ -48,7 +48,8 @@
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "telegram": "^2.26.22",
-
+    "tsc-alias": "^1.8.10",
+    "tsconfig-paths": "^4.2.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
@@ -70,7 +71,6 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.2.5",
     "ts-node-dev": "^2.0.0",
-    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"
   },
   "engines": {

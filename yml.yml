@@ -1,0 +1,23 @@
+services:
+  # Frontend React Application
+  admin-dashboard:
+    image: ghcr.io/tambongstercy/antic-notifications-admin:v1.0.0
+    container_name: antic-admin-dashboard
+    network_mode: host  # Add this line
+    # Remove the ports section since using host networking
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    # Remove networks section since using host networking
+
+  # Backend Node.js Application
+  notification-service:
+    image: ghcr.io/tambongstercy/antic-notifications-backend:v1.0.0
+    container_name: antic-notification-service
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - ./sessions:/app/sessions
+      - ./logs:/app/logs
+    restart: unless-stopped

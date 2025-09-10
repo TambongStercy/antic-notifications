@@ -1,0 +1,26 @@
+services:
+  # Frontend React Application
+  admin-dashboard:
+    image: ghcr.io/tambongstercy/antic-notifications-admin:v1.0.0
+    container_name: antic-admin-dashboard
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      REACT_APP_API_URL: http://localhost:3000
+    restart: unless-stopped
+
+  # Backend Node.js Application
+  notification-service:
+    image: ghcr.io/tambongstercy/antic-notifications-backend:v1.0.0
+    container_name: antic-notification-service
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      WEBSOCKET_PORT: 3002
+      WHATSAPP_SESSION_PATH: /app/sessions/whatsapp
+    volumes:
+      - ./sessions:/app/sessions
+      - ./logs:/app/logs
+    restart: unless-stopped

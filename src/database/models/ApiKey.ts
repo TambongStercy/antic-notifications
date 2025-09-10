@@ -37,7 +37,7 @@ const apiKeySchema = new Schema<IApiKey>({
     },
     permissions: [{
         type: String,
-        enum: ['whatsapp:send', 'telegram:send', 'messages:read', 'status:read'],
+        enum: ['whatsapp:send', 'telegram:send', 'mattermost:send', 'messages:read', 'status:read'],
         required: true
     }],
     isActive: {

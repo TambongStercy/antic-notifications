@@ -204,3 +204,6 @@ sessions/
 uploads/
 temp/
 logs/
+
+# Archive files
+*.tar.gztls/

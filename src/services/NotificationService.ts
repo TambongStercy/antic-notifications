@@ -95,10 +95,9 @@ export class NotificationService {
     public async health(version: string): Promise<HealthCheckResponse> {
         const dbHealth = await db.healthCheck();
         const services = await this.statusRepository.getServiceHealthStatus();
-        const overallHealthy = dbHealth.status === 'connected' &&
-            ['connected', 'not_configured'].includes(services.whatsapp) &&
-            ['connected', 'not_configured'].includes(services.telegram) &&
-            ['connected', 'not_configured'].includes(services.mattermost);
+        // Consider healthy if database is connected and app is running
+        // Messaging services can be disconnected during startup/configuration
+        const overallHealthy = dbHealth.status === 'connected';
 
         return {
             status: overallHealthy ? 'healthy' : 'unhealthy',

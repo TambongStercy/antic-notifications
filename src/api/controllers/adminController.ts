@@ -269,7 +269,7 @@ export class AdminController {
 
             // If no QR code, wait a bit for it to be generated
             if (!qrCode) {
-                qrCode = await whatsapp.waitForQRCode(8000); // Wait up to 8 seconds
+                qrCode = await whatsapp.waitForQRCode(15000); // Increased to 15 seconds
             }
 
             if (!qrCode) {
@@ -505,7 +505,10 @@ export class AdminController {
                 });
             }
         } catch (err) {
-            logger.error('Mattermost connection error:', err);
+            logger.error('Mattermost connection error:', { 
+                message: err instanceof Error ? err.message : 'Unknown error',
+                stack: err instanceof Error ? err.stack : undefined
+            });
             return res.status(500).json({
                 error: {
                     code: 'internal_error',

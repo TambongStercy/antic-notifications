@@ -24,7 +24,7 @@ export function sanitizePhoneNumber(phoneNumber: string): string {
     if (!phoneNumber || typeof phoneNumber !== 'string') {
         return '';
     }
-    
+
     // Remove all spaces, dashes, parentheses, and non-digit characters except +
     return phoneNumber.replace(/[\s\-\(\)\[\]\.]/g, '').replace(/[^\d\+]/g, '');
 }
@@ -36,7 +36,7 @@ export function sanitizePhoneNumber(phoneNumber: string): string {
  */
 export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidationResult {
     const sanitized = sanitizePhoneNumber(phoneNumber);
-    
+
     if (!sanitized) {
         return {
             isValid: false,
@@ -44,10 +44,10 @@ export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidatio
             error: 'Phone number is required'
         };
     }
-    
+
     // Remove leading + if present
     const cleanNumber = sanitized.replace(/^\+/, '');
-    
+
     // Check minimum length (international format should be at least 10 digits)
     if (cleanNumber.length < 10) {
         return {
@@ -56,7 +56,7 @@ export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidatio
             error: 'Phone number must be at least 10 digits long'
         };
     }
-    
+
     // Check maximum length (most international numbers are 15 digits max)
     if (cleanNumber.length > 15) {
         return {
@@ -65,7 +65,7 @@ export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidatio
             error: 'Phone number must be no more than 15 digits long'
         };
     }
-    
+
     // Check if it starts with valid international prefix
     if (!cleanNumber.match(/^[1-9]/)) {
         return {
@@ -74,7 +74,7 @@ export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidatio
             error: 'Phone number must start with a valid country code (1-9)'
         };
     }
-    
+
     return {
         isValid: true,
         cleanNumber,
@@ -89,7 +89,7 @@ export function validateWhatsAppPhoneNumber(phoneNumber: string): PhoneValidatio
  */
 export function validateTelegramPhoneNumber(phoneNumber: string): PhoneValidationResult {
     // For Telegram, we support chat IDs (numbers), usernames (@username), and phone numbers
-    
+
     // Check if it's a username (starts with @)
     if (phoneNumber.startsWith('@')) {
         if (phoneNumber.length < 6) {
@@ -105,19 +105,32 @@ export function validateTelegramPhoneNumber(phoneNumber: string): PhoneValidatio
             formatted: phoneNumber
         };
     }
-    
-    // Check if it's a numeric chat ID
-    const numericId = phoneNumber.replace(/\D/g, '');
-    if (numericId && numericId === phoneNumber.replace(/[\s\-\+]/g, '')) {
+
+    // Check if it's a pure numeric chat ID (typically negative for groups, or very large positive numbers)
+    // Chat IDs are usually much larger than phone numbers or negative
+    const numericOnly = phoneNumber.replace(/\D/g, '');
+    const isNegativeChatId = phoneNumber.trim().startsWith('-');
+    const isLargeChatId = numericOnly.length > 15; // Phone numbers are max 15 digits
+
+    if (isNegativeChatId || isLargeChatId) {
         return {
             isValid: true,
-            cleanNumber: numericId,
-            formatted: numericId
+            cleanNumber: phoneNumber.trim(),
+            formatted: phoneNumber.trim()
         };
     }
-    
-    // Otherwise, validate as phone number
-    return validateWhatsAppPhoneNumber(phoneNumber);
+
+    // Otherwise, validate as phone number (this will add + prefix if needed)
+    const phoneValidation = validateWhatsAppPhoneNumber(phoneNumber);
+    if (phoneValidation.isValid) {
+        return {
+            isValid: true,
+            cleanNumber: phoneValidation.formatted || `+${phoneValidation.cleanNumber}`,
+            formatted: phoneValidation.formatted || `+${phoneValidation.cleanNumber}`
+        };
+    }
+
+    return phoneValidation;
 }
 
 /**
@@ -145,16 +158,16 @@ export function validateMattermostChannelId(channelId: string): MattermostChanne
             error: 'Channel ID is required'
         };
     }
-    
+
     const sanitized = channelId.trim();
-    
+
     if (!sanitized) {
         return {
             isValid: false,
             error: 'Channel ID cannot be empty'
         };
     }
-    
+
     // Mattermost channel IDs are typically 26 characters long, alphanumeric
     if (!/^[a-zA-Z0-9]{26}$/.test(sanitized)) {
         return {
@@ -162,7 +175,7 @@ export function validateMattermostChannelId(channelId: string): MattermostChanne
             error: 'Invalid channel ID format. Must be 26 alphanumeric characters.'
         };
     }
-    
+
     return {
         isValid: true,
         channelId: sanitized

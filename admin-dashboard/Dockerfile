@@ -1,6 +1,9 @@
 # Multi-stage build for the React frontend
 FROM node:18-alpine AS builder
 
+# Build arguments for configurable environment variables
+ARG VITE_API_URL=""
+
 # Set working directory
 WORKDIR /app
 
@@ -12,6 +15,9 @@ RUN npm ci
 
 # Copy source code
 COPY . .
+
+# Set environment variable for Vite build
+ENV VITE_API_URL=${VITE_API_URL}
 
 # Build the application
 RUN npm run build
@@ -25,9 +31,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Create non-root user
+# Create non-root user and ensure nginx directories exist with proper permissions
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
+    mkdir -p /var/cache/nginx /var/log/nginx && \
     chown -R nodejs:nodejs /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx
 
 # Switch to non-root user

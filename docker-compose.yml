@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: antic-admin-dashboard
     ports:
-      - "3001:80"
+      - "8080:80"
     environment:
       NODE_ENV: production
     depends_on:
@@ -21,13 +21,13 @@ services:
     build: .
     container_name: antic-notification-service
     ports:
-      - "3000:3000"
-      - "3002:3002"
+      - "8000:3000"
+      - "8002:3002"
     environment:
       NODE_ENV: production
       PORT: 3000
       WEBSOCKET_PORT: 3002
-      MONGODB_URI: ${MONGODB_URI:-mongodb://localhost:27017/notification-service}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://host.docker.internal:27017/notification-service}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
@@ -35,13 +35,11 @@ services:
       WHATSAPP_SESSION_PATH: /app/sessions/whatsapp
       LOG_LEVEL: info
       LOG_FILE: /app/logs/app.log
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
     volumes:
       - whatsapp-sessions:/app/sessions/whatsapp
       - app-logs:/app/logs
-    # depends_on:
-      # mongo:
-        # condition: service_healthy
+    # No database dependency - using host MongoDB
     restart: unless-stopped
     networks:
       - notification-network
@@ -52,51 +50,8 @@ services:
       retries: 3
       start_period: 40s
 
-  mongo:
-    image: mongo:7
-    container_name: antic-mongo
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: notification-service
-    volumes:
-      - mongo-data:/data/db
-      - mongo-config:/data/configdb
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - notification-network
-
-  mongo-express:
-    image: mongo-express:latest
-    container_name: antic-mongo-express
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGOEXPRESS_LOGIN:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGOEXPRESS_PASSWORD}
-    depends_on:
-      mongo:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - notification-network
 
 volumes:
-  mongo-data:
-    driver: local
-  mongo-config:
-    driver: local
   whatsapp-sessions:
     driver: local
   app-logs:

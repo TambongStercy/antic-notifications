@@ -3,7 +3,7 @@ import { ApiKeyRepository } from '@/database/repositories/ApiKeyRepository';
 import { config } from '@/config/environment';
 import logger from '@/utils/logger';
 
-interface AuthenticatedRequest extends Request {
+type AuthenticatedRequest = Request & {
     apiKey?: {
         id: string;
         name: string;
@@ -13,7 +13,7 @@ interface AuthenticatedRequest extends Request {
             windowMs: number;
         };
     };
-}
+};
 
 const apiKeyRepo = new ApiKeyRepository();
 
@@ -245,4 +245,3 @@ export const apiKeyAuth = (requiredPermission?: string, allowSameOrigin: boolean
     };
 };
 
-export { AuthenticatedRequest };

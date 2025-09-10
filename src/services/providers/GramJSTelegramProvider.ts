@@ -337,8 +337,10 @@ export class GramJSTelegramProvider extends (EventEmitter as { new(): EventEmitt
                 let entity: any;
                 const cleanRecipient = recipientValidation.cleanNumber;
                 const isUsername = cleanRecipient.startsWith('@');
-                const isNumericId = /^\d+$/.test(cleanRecipient);
-                const isPhone = !isUsername && !isNumericId;
+                const isNegativeChatId = cleanRecipient.startsWith('-');
+                const isLargeChatId = /^\d+$/.test(cleanRecipient) && cleanRecipient.length > 15;
+                const isChatId = isNegativeChatId || isLargeChatId;
+                const isPhone = !isUsername && !isChatId && cleanRecipient.startsWith('+');
 
                 logger.info(`Resolving Telegram entity for: ${sanitizedRecipient}`);
 
@@ -378,9 +380,10 @@ export class GramJSTelegramProvider extends (EventEmitter as { new(): EventEmitt
                     } catch (entityErr) {
                         throw new Error(`Username ${cleanRecipient} not found on Telegram`);
                     }
-                } else if (isNumericId) {
+                } else if (isChatId) {
                     try {
-                        entity = await this.client.getEntity(parseInt(cleanRecipient, 10));
+                        const chatId = isNegativeChatId ? parseInt(cleanRecipient, 10) : cleanRecipient;
+                        entity = await this.client.getEntity(chatId);
                     } catch (entityErr) {
                         throw new Error(`Chat ID ${cleanRecipient} not found or not accessible`);
                     }

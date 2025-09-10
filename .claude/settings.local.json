@@ -5,7 +5,11 @@
       "WebFetch(domain:developers.mattermost.com)",
       "WebFetch(domain:api.mattermost.com)",
       "WebSearch",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Read(c:\\Users\\LENOVO\\Pictures\\Screenshots/**)",
+      "Bash(docker logs:*)",
+      "Read(/C:\\Users\\LENOVO\\Desktop\\projects\\Flutter Dev projects\\Costumer projects\\antic-notitification-service\\src\\services\\providers/**)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

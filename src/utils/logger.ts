@@ -18,7 +18,11 @@ const consoleFormat = winston.format.combine(
     let log = `${timestamp} [${level}]: ${message}`;
     
     if (Object.keys(meta).length > 0) {
-      log += ` ${JSON.stringify(meta)}`;
+      try {
+        log += ` ${JSON.stringify(meta)}`;
+      } catch (error) {
+        log += ` [Error serializing metadata: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+      }
     }
     
     if (stack) {

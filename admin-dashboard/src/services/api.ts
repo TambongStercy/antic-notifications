@@ -10,7 +10,7 @@ import type {
     NotificationRequest
 } from '@/types'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 // Create axios instance
 const api = axios.create({
@@ -46,6 +46,11 @@ api.interceptors.response.use(
         }
 
         if (status === 401) {
+            // Do not logout for login attempts
+            if (error.config?.url?.includes('/api/admin/login')) {
+                throw error
+            }
+
             // Do not logout for API key-related 401s
             const apiKeyCodes = new Set([
                 'missing_api_key',
@@ -133,8 +138,9 @@ export const servicesAPI = {
         await api.post('/api/admin/whatsapp/disconnect')
     },
 
-    connectTelegram: async (): Promise<void> => {
-        await api.post('/api/admin/telegram/connect')
+    connectTelegram: async (): Promise<any> => {
+        const response = await api.post('/api/admin/telegram/connect')
+        return response.data
     },
 
     disconnectTelegram: async (): Promise<void> => {

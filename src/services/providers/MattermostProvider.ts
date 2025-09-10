@@ -24,7 +24,7 @@ export class MattermostProvider implements INotificationProvider {
 
     constructor() {
         // Set default timeout
-        this.axios.defaults.timeout = 30000;
+        this.axios.defaults.timeout = 180000; // 3 minutes
     }
 
     getServiceType(): ServiceType {
@@ -60,7 +60,10 @@ export class MattermostProvider implements INotificationProvider {
             logger.info('Mattermost provider initialized successfully');
         } catch (error) {
             this.isConnected = false;
-            logger.error('Failed to initialize Mattermost provider:', error);
+            logger.error('Failed to initialize Mattermost provider:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined
+            });
             throw error;
         }
     }

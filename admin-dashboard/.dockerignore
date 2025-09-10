@@ -1,0 +1,13 @@
+# Exclude everything first
+*
+
+# Only include what we need
+!src/
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.node.json
+!index.html
+!vite.config.ts
+!nginx.conf
+!.env

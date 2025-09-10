@@ -108,7 +108,7 @@ export const createApiKeySchema = Joi.object({
         'any.required': 'API key name is required'
     }),
     permissions: Joi.array().items(
-        Joi.string().valid('whatsapp:send', 'telegram:send', 'messages:read', 'status:read')
+        Joi.string().valid('whatsapp:send', 'telegram:send', 'mattermost:send', 'messages:read', 'status:read')
     ).min(1).required().messages({
         'array.min': 'At least one permission is required',
         'any.required': 'Permissions are required',
@@ -124,7 +124,7 @@ export const createApiKeySchema = Joi.object({
 export const updateApiKeySchema = Joi.object({
     name: Joi.string().min(1).max(100).optional(),
     permissions: Joi.array().items(
-        Joi.string().valid('whatsapp:send', 'telegram:send', 'messages:read', 'status:read')
+        Joi.string().valid('whatsapp:send', 'telegram:send', 'mattermost:send', 'messages:read', 'status:read')
     ).min(1).optional(),
     isActive: Joi.boolean().optional(),
     rateLimit: Joi.object({

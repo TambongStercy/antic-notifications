@@ -1,0 +1,72 @@
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: antic-nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./tls/antic.cm/antic.crt:/etc/ssl/certs/antic.crt
+      - ./tls/antic.cm/antic.key:/etc/ssl/private/antic.key
+      - ./tls/antic.cm/intermediaire.crt:/etc/ssl/certs/intermediate.crt
+    restart: unless-stopped
+    networks:
+      - notification-network
+    depends_on:
+      - notification-service
+      - admin-dashboard
+
+  # Backend Node.js Application
+  notification-service:
+    image: ghcr.io/tambongstercy/antic-notifications-backend:v1.0.0
+    container_name: antic-notification-service
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "3002:3002"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HTTPS_PORT: 3001
+      WEBSOCKET_PORT: 3002
+      MONGODB_URI: mongodb://172.17.0.1:27017/notification-service
+      WHATSAPP_SESSION_PATH: /app/sessions/whatsapp
+      SSL_CERT_PATH: /app/tls/antic.cm/antic.crt
+      SSL_KEY_PATH: /app/tls/antic.cm/antic.key
+      SSL_INTERMEDIATE_PATH: /app/tls/antic.cm/intermediaire.crt
+      CORS_ORIGIN: https://notification.antic.cm
+    volumes:
+      - ./sessions:/app/sessions
+      - ./logs:/app/logs
+      - ./tls:/app/tls
+    restart: unless-stopped
+    networks:
+      - notification-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend React Application  
+  admin-dashboard:
+    image: ghcr.io/tambongstercy/antic-notifications-admin:v1.0.2
+    container_name: antic-admin-dashboard
+    # No external ports needed - accessed through nginx
+    # ports:
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    networks:
+      - notification-network
+    depends_on:
+      - notification-service
+
+networks:
+  notification-network:
+    driver: bridge
