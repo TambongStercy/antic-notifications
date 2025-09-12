@@ -8,7 +8,7 @@ export interface IMessage extends Omit<MessageRecord, 'id'>, Document {
 const MessageSchema = new Schema<IMessage>({
   service: {
     type: String,
-    enum: ['whatsapp', 'telegram'] as ServiceType[],
+    enum: ['whatsapp', 'telegram', 'mattermost'] as ServiceType[],
     required: true,
     index: true,
   },
@@ -21,7 +21,7 @@ const MessageSchema = new Schema<IMessage>({
   message: {
     type: String,
     required: true,
-    maxlength: 4096, // WhatsApp message limit
+    maxlength: 16000, // Mattermost message limit (highest among services)
   },
   status: {
     type: String,
@@ -94,6 +94,13 @@ MessageSchema.pre('save', function (this: IMessage, next) {
     const isId = /^\d+$/.test(this.recipient);
     if (!(isPhone || isUsername || isId)) {
       return next(new Error('Invalid Telegram recipient format. Must be a phone number, chat ID, or @username.'));
+    }
+  } else if (this.service === 'mattermost') {
+    // Mattermost format: 26-character channel ID or email address
+    const isChannelId = /^[a-z0-9]{26}$/.test(this.recipient);
+    const isEmail = /^[^\s@]+@[^\s@]+/.test(this.recipient);
+    if (!(isChannelId || isEmail)) {
+      return next(new Error('Invalid Mattermost recipient format. Must be a 26-character channel ID or email address.'));
     }
   }
 

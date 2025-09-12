@@ -231,6 +231,37 @@ export class ServiceStatusRepository extends BaseRepository<IServiceStatus> {
   }
 
   /**
+   * Set Mattermost credentials
+   */
+  async setMattermostCredentials(credentials: { serverUrl: string; accessToken: string; defaultChannelId?: string }): Promise<IServiceStatus> {
+    try {
+      return await this.updateServiceStatus('mattermost', {
+        status: 'disconnected', // Will be updated to connected after validation
+        metadata: { credentials }
+      });
+    } catch (error) {
+      logger.error('Error setting Mattermost credentials:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Mattermost credentials from metadata
+   */
+  async getMattermostCredentials(): Promise<{ serverUrl: string; accessToken: string; defaultChannelId?: string } | null> {
+    try {
+      const status = await ServiceStatus.findOne({ service: 'mattermost' })
+        .select('+metadata.credentials')
+        .exec();
+
+      return status?.metadata?.credentials || null;
+    } catch (error) {
+      logger.error('Error getting Mattermost credentials:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update connection info for a service
    */
   async updateConnectionInfo(

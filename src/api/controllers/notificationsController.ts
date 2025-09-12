@@ -39,6 +39,63 @@ export class NotificationsController {
             res.json({ messageId: sendResult.externalMessageId });
         } catch (err) { next(err); }
     };
+
+    sendMattermost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { recipient, message, metadata } = req.body;
+            const requestedBy: string | undefined = (req as any).requestedBy;
+
+            // Get Mattermost provider
+            const { mattermost } = this.service.getProviders();
+            if (!mattermost.isServiceConnected()) {
+                res.status(400).json({ 
+                    error: { 
+                        code: 'mattermost_send_failed', 
+                        message: 'Mattermost not configured or connected' 
+                    }, 
+                    timestamp: new Date().toISOString(), 
+                    path: req.originalUrl 
+                });
+                return;
+            }
+
+            let sendResult;
+            
+            // Check if recipient is an email address
+            if (recipient.includes('@')) {
+                // Send by email (will do user lookup and create DM channel)
+                sendResult = await mattermost.sendTextByEmail(recipient, message, { 
+                    ...(metadata || {}), 
+                    requestedBy 
+                });
+            } else {
+                // Send by channel ID
+                sendResult = await mattermost.sendText(recipient, message, { 
+                    ...(metadata || {}), 
+                    requestedBy 
+                });
+            }
+
+            if (!sendResult.success) {
+                res.status(400).json({ 
+                    error: { 
+                        code: 'mattermost_send_failed', 
+                        message: sendResult.errorMessage 
+                    }, 
+                    timestamp: new Date().toISOString(), 
+                    path: req.originalUrl 
+                });
+                return;
+            }
+
+            res.json({ 
+                messageId: sendResult.messageId,
+                metadata: sendResult.metadata 
+            });
+        } catch (err) { 
+            next(err); 
+        }
+    };
 }
 
 export default NotificationsController;

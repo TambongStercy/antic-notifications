@@ -68,7 +68,7 @@ const ApiDocumentation: React.FC = () => {
         let normalized = input
             .trim() // Remove leading/trailing spaces
             .replace(/\s+/g, '') // Remove all spaces
-            .replace(/[^\w@+]/g, ''); // Keep only alphanumeric, @, and + characters
+            .replace(/[^\w@+.-]/g, ''); // Keep alphanumeric, @, +, dots, and hyphens for emails
 
         // If it looks like a phone number (all digits, 7+ characters) but missing +, add it
         if (/^\d{7,}$/.test(normalized)) {

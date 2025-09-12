@@ -1,0 +1,342 @@
+# Antic Notification Service API Testing
+# Use with REST Client extension in VS Code
+
+### Variables
+@baseUrl = http://10.10.10.191:8080
+@adminUrl = http://10.10.10.191:8080/api/admin
+@apiUrl = http://10.10.10.191:8080/api
+@username = admin
+@password = your-admin-password
+@token = {{loginResponse.response.body.$.data.accessToken}}
+
+###############################################
+# AUTHENTICATION
+###############################################
+
+### Admin Login
+# @name loginResponse
+POST {{adminUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### Refresh Token
+POST {{adminUrl}}/refresh
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "refreshToken": "your-refresh-token-here"
+}
+
+###############################################
+# HEALTH & STATUS
+###############################################
+
+### Health Check
+GET {{apiUrl}}/health
+
+### Admin Status (requires auth)
+GET {{adminUrl}}/status
+Authorization: Bearer {{token}}
+
+###############################################
+# MATTERMOST CONFIGURATION
+###############################################
+
+### Configure Mattermost
+POST {{adminUrl}}/services/mattermost/configure
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "serverUrl": "https://teamwork.antic.cm",
+  "accessToken": "your-mattermost-personal-access-token"
+}
+
+### Connect Mattermost
+POST {{adminUrl}}/services/mattermost/connect
+Authorization: Bearer {{token}}
+
+### Disconnect Mattermost
+POST {{adminUrl}}/services/mattermost/disconnect
+Authorization: Bearer {{token}}
+
+### Get Mattermost Channels
+GET {{adminUrl}}/services/mattermost/channels
+Authorization: Bearer {{token}}
+
+### Get Mattermost Channel Info
+GET {{adminUrl}}/services/mattermost/channels/channel-id-here
+Authorization: Bearer {{token}}
+
+###############################################
+# TELEGRAM CONFIGURATION
+###############################################
+
+### Configure Telegram Bot
+POST {{adminUrl}}/services/telegram/configure
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "botToken": "your-telegram-bot-token"
+}
+
+### Connect Telegram
+POST {{adminUrl}}/services/telegram/connect
+Authorization: Bearer {{token}}
+
+### Disconnect Telegram
+POST {{adminUrl}}/services/telegram/disconnect
+Authorization: Bearer {{token}}
+
+###############################################
+# WHATSAPP CONFIGURATION
+###############################################
+
+### Connect WhatsApp (will show QR code)
+POST {{adminUrl}}/services/whatsapp/connect
+Authorization: Bearer {{token}}
+
+### Disconnect WhatsApp
+POST {{adminUrl}}/services/whatsapp/disconnect
+Authorization: Bearer {{token}}
+
+### Get WhatsApp QR Code
+GET {{adminUrl}}/services/whatsapp/qr
+Authorization: Bearer {{token}}
+
+###############################################
+# NOTIFICATION SENDING
+###############################################
+
+### Send Mattermost Message (Channel ID) - JSON
+POST {{apiUrl}}/notifications/mattermost
+Content-Type: application/json
+
+{
+  "recipient": "channel-id-here",
+  "message": "Hello from REST Client! 🚀",
+  "metadata": {
+    "priority": "normal",
+    "source": "api-test"
+  }
+}
+
+### Send Mattermost Message (Channel ID) - Form Data
+POST {{apiUrl}}/notifications/mattermost
+Content-Type: application/x-www-form-urlencoded
+
+recipient=channel-id-here&message=Hello from form data test! 🚀
+
+### Send Mattermost Message (User Email) - JSON
+POST {{apiUrl}}/notifications/mattermost
+Content-Type: application/json
+
+{
+  "recipient": "user@company.com",
+  "message": "Hello! This message was sent to your email address and automatically creates a DM.",
+  "metadata": {
+    "urgent": true,
+    "source": "email-test"
+  }
+}
+
+### Send Mattermost Message (User Email) - Form Data
+POST {{apiUrl}}/notifications/mattermost
+Content-Type: application/x-www-form-urlencoded
+
+recipient=user@company.com&message=Email test via form data!
+
+### Send Mattermost Message (Direct Channel ID)
+POST {{apiUrl}}/notifications/mattermost
+Content-Type: application/json
+
+{
+  "recipient": "direct-channel-id-here",
+  "message": "This is a direct message test using channel ID",
+  "metadata": {
+    "urgent": true
+  }
+}
+
+### Send Telegram Message - JSON
+POST {{apiUrl}}/notifications/send
+Content-Type: application/json
+
+{
+  "service": "telegram",
+  "recipient": "chat-id-or-username",
+  "message": "Hello from Telegram! 📱"
+}
+
+### Send Telegram Message - Form Data
+POST {{apiUrl}}/notifications/send
+Content-Type: application/x-www-form-urlencoded
+
+service=telegram&recipient=chat-id-or-username&message=Hello from Telegram form data! 📱
+
+### Send WhatsApp Message - JSON
+POST {{apiUrl}}/notifications/send
+Content-Type: application/json
+
+{
+  "service": "whatsapp",
+  "recipient": "+1234567890",
+  "message": "Hello from WhatsApp! 📞"
+}
+
+### Send WhatsApp Message - Form Data
+POST {{apiUrl}}/notifications/send
+Content-Type: application/x-www-form-urlencoded
+
+service=whatsapp&recipient=+1234567890&message=Hello from WhatsApp form data! 📞
+
+### Send WhatsApp Media
+POST {{apiUrl}}/notifications/send-media
+Content-Type: application/json
+
+{
+  "service": "whatsapp",
+  "recipient": "+1234567890",
+  "mediaPath": "/path/to/image.jpg",
+  "caption": "Check out this image!"
+}
+
+###############################################
+# BULK NOTIFICATIONS
+###############################################
+
+### Send Bulk Messages (Multiple Services)
+POST {{apiUrl}}/notifications/bulk-send
+Content-Type: application/json
+
+{
+  "message": "System maintenance in 30 minutes",
+  "services": [
+    {
+      "service": "mattermost",
+      "recipient": "general-channel-id"
+    },
+    {
+      "service": "telegram", 
+      "recipient": "admin-chat-id"
+    },
+    {
+      "service": "whatsapp",
+      "recipient": "+1234567890"
+    }
+  ],
+  "metadata": {
+    "priority": "high",
+    "category": "system-alert"
+  }
+}
+
+###############################################
+# MESSAGE HISTORY & MANAGEMENT
+###############################################
+
+### Get Message History
+GET {{adminUrl}}/messages?page=1&limit=20&service=mattermost
+Authorization: Bearer {{token}}
+
+### Get Specific Message
+GET {{adminUrl}}/messages/message-id-here
+Authorization: Bearer {{token}}
+
+### Get Failed Messages
+GET {{adminUrl}}/messages?status=failed
+Authorization: Bearer {{token}}
+
+### Retry Failed Message
+POST {{adminUrl}}/messages/message-id-here/retry
+Authorization: Bearer {{token}}
+
+###############################################
+# API KEY MANAGEMENT
+###############################################
+
+### Create API Key
+POST {{adminUrl}}/api-keys
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Test API Key",
+  "description": "For testing purposes",
+  "permissions": ["notifications:send"],
+  "expiresAt": "2024-12-31T23:59:59.000Z"
+}
+
+### List API Keys
+GET {{adminUrl}}/api-keys
+Authorization: Bearer {{token}}
+
+### Delete API Key
+DELETE {{adminUrl}}/api-keys/api-key-id-here
+Authorization: Bearer {{token}}
+
+### Test API Key Usage (instead of JWT token)
+POST {{apiUrl}}/notifications/send
+Content-Type: application/json
+X-API-Key: your-api-key-here
+
+{
+  "service": "mattermost",
+  "recipient": "channel-id",
+  "message": "Test using API Key authentication"
+}
+
+###############################################
+# WEBSOCKET TESTING (Information Only)
+###############################################
+
+# WebSocket endpoints (use a WebSocket client):
+# ws://localhost:3002 - General WebSocket connection
+# 
+# Events you'll receive:
+# - qr-code: WhatsApp QR code data
+# - service-status: Service connection status changes
+# - message-status: Message delivery status updates
+
+###############################################
+# ERROR TESTING
+###############################################
+
+### Test Invalid Service
+POST {{apiUrl}}/notifications/send
+Content-Type: application/json
+
+{
+  "service": "invalid-service",
+  "recipient": "test",
+  "message": "This should fail"
+}
+
+### Test Missing Authorization
+GET {{adminUrl}}/status
+
+### Test Invalid Token
+GET {{adminUrl}}/status
+Authorization: Bearer invalid-token-here
+
+###############################################
+# DEVELOPMENT HELPERS
+###############################################
+
+### Get Environment Info
+GET {{adminUrl}}/environment
+Authorization: Bearer {{token}}
+
+### Test Database Connection
+GET {{adminUrl}}/database/test
+Authorization: Bearer {{token}}
+
+### Get Service Logs
+GET {{adminUrl}}/logs?lines=100&level=error
+Authorization: Bearer {{token}}

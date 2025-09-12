@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { sanitizePhoneNumber, validateWhatsAppPhoneNumber, validateTelegramPhoneNumber } from '@/utils/phoneNumber';
+import { sanitizePhoneNumber, validateWhatsAppPhoneNumber, validateTelegramPhoneNumber, validateMattermostChannelId } from '@/utils/phoneNumber';
 
 // Custom Joi validators
 const whatsappRecipientValidator = Joi.string().custom((value, helpers) => {
@@ -22,6 +22,27 @@ const telegramRecipientValidator = Joi.string().custom((value, helpers) => {
     return validation.formatted || validation.cleanNumber;
 }).messages({
     'telegram.invalid': '{{#message}}'
+});
+
+const mattermostRecipientValidator = Joi.string().custom((value, helpers) => {
+    // Check if it's an email address first
+    if (value.includes('@')) {
+        // More relaxed email validation for internal domains
+        const emailRegex = /^[^\s@]+@[^\s@]+$/;
+        if (!emailRegex.test(value) || value.length < 3) {
+            return helpers.error('mattermost.invalid', { message: 'Invalid email address format' });
+        }
+        return value; // Return email as-is for lookup
+    }
+    
+    // Otherwise validate as channel ID
+    const validation = validateMattermostChannelId(value);
+    if (!validation.isValid) {
+        return helpers.error('mattermost.invalid', { message: validation.error });
+    }
+    return validation.channelId;
+}).messages({
+    'mattermost.invalid': '{{#message}}'
 });
 
 // Notification schemas
@@ -49,6 +70,15 @@ export const telegramNotificationSchema = notificationRequestSchema.keys({
     recipient: telegramRecipientValidator.required(),
     message: Joi.string().required().min(1).max(4096).trim().messages({
         'string.max': 'Telegram message cannot exceed 4,096 characters',
+        'string.empty': 'Message content is required',
+        'any.required': 'Message is required'
+    }),
+});
+
+export const mattermostNotificationSchema = notificationRequestSchema.keys({
+    recipient: mattermostRecipientValidator.required(),
+    message: Joi.string().required().min(1).max(16000).trim().messages({
+        'string.max': 'Mattermost message cannot exceed 16,000 characters',
         'string.empty': 'Message content is required',
         'any.required': 'Message is required'
     }),
@@ -84,7 +114,7 @@ export const paginationSchema = Joi.object({
 });
 
 export const messageFiltersSchema = Joi.object({
-    service: Joi.string().valid('whatsapp', 'telegram').optional(),
+    service: Joi.string().valid('whatsapp', 'telegram', 'mattermost').optional(),
     status: Joi.string().valid('pending', 'sent', 'failed').optional(),
     recipient: Joi.string().optional(),
     dateFrom: Joi.date().iso().optional(),
@@ -138,6 +168,7 @@ export default {
     notificationRequestSchema,
     whatsappNotificationSchema,
     telegramNotificationSchema,
+    mattermostNotificationSchema,
     adminLoginSchema,
     telegramTokenSchema,
     refreshTokenSchema,

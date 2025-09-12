@@ -5,14 +5,14 @@ import { authMiddleware } from '@/api/middleware/auth';
 // Simple in-memory rate limit store for admin tokens (use Redis in production)
 const adminRateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Fixed limit requested: 50 requests per hour for admin tokens
+// Very generous limit for admin tokens for normal website usage
 const ADMIN_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const ADMIN_RATE_LIMIT_MAX = 50;
+const ADMIN_RATE_LIMIT_MAX = 10000; // 10,000 requests per hour (very generous)
 
 /**
  * Middleware that authenticates using either X-API-Key with optional permission
- * or an admin Bearer token. When using the admin token, enforce a 50/hour rate limit
- * per admin user.
+ * or an admin Bearer token. When using the admin token, enforce a 10,000/hour rate limit
+ * per admin user (very generous for normal website usage).
  */
 export const apiKeyOrAdminAuth = (requiredPermission?: string) => {
     return (req: Request, res: Response, next: NextFunction) => {

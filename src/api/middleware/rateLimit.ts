@@ -15,10 +15,10 @@ export const apiRateLimiter = rateLimit({
     }
 });
 
-// More lenient rate limiter for admin endpoints (authenticated users)
+// Very lenient rate limiter for admin endpoints (authenticated users)
 export const adminRateLimiter = rateLimit({
     windowMs: 60000, // 1 minute window
-    max: 300, // 300 requests per minute (5 per second average)
+    max: 5000, // 5000 requests per minute (very generous for admin dashboard)
     standardHeaders: true,
     legacyHeaders: false,
     message: {

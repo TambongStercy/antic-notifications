@@ -23,6 +23,8 @@ services:
     ports:
       - "8000:3000"
       - "8002:3002"
+    extra_hosts:
+      - "teamwork.antic.cm:10.10.40.237"  # Force domain to local IP
     environment:
       NODE_ENV: production
       PORT: 3000

@@ -37,6 +37,9 @@ export class NotificationService {
         // Load existing telegram credentials if available
         await this.telegram.loadExistingCredentials();
 
+        // Load existing Mattermost credentials if available
+        await this.mattermost.loadExistingCredentials();
+
         // Initialize WhatsApp (will generate QR or restore session)
         await this.whatsapp.init();
 
@@ -50,6 +53,22 @@ export class NotificationService {
             }
         } else if (this.telegram.isConfigured()) {
             logger.info('Telegram credentials configured, ready for manual connection');
+        }
+
+        // Auto-connect Mattermost if credentials exist (no user interaction required)
+        if (this.mattermost.isConfigured() && this.mattermost.canAutoConnect()) {
+            try {
+                // Mattermost is already connected during loadExistingCredentials if successful
+                if (this.mattermost.isServiceConnected()) {
+                    logger.info('Mattermost auto-connected using stored credentials');
+                } else {
+                    logger.info('Mattermost credentials configured, ready for manual connection');
+                }
+            } catch (err) {
+                logger.warn('Mattermost auto-connect failed; manual connect required');
+            }
+        } else if (this.mattermost.isConfigured()) {
+            logger.info('Mattermost credentials configured, ready for manual connection');
         }
 
         // Initialize service status records

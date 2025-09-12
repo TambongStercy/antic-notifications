@@ -39,8 +39,8 @@ const envSchema = Joi.object({
 
   // Security
   BCRYPT_ROUNDS: Joi.number().default(12),
-  RATE_LIMIT_WINDOW_MS: Joi.number().default(900000),
-  RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
+  RATE_LIMIT_WINDOW_MS: Joi.number().default(60000), // 1 minute window instead of 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: Joi.number().default(10000), // 10,000 requests per minute (very generous)
 
   // API Key
   MASTER_API_KEY: Joi.string().allow('').optional(),

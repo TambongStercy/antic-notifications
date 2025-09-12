@@ -1,6 +1,8 @@
 import { INotificationProvider, SendResult } from './INotificationProvider';
 import { ServiceType } from '@/types';
 import { validateMattermostChannelId, sanitizePhoneNumber } from '@/utils/phoneNumber';
+import { MessageRepository } from '@/database/repositories/MessageRepository';
+import { ServiceStatusRepository } from '@/database/repositories/ServiceStatusRepository';
 import logger from '@/utils/logger';
 import axios, { AxiosError } from 'axios';
 
@@ -21,10 +23,17 @@ export class MattermostProvider implements INotificationProvider {
     private config: MattermostConfig | null = null;
     private isConnected: boolean = false;
     private axios = axios.create();
+    private messageRepository: MessageRepository;
+    private statusRepository: ServiceStatusRepository;
 
-    constructor() {
+    constructor(deps?: { 
+        messageRepository?: MessageRepository;
+        statusRepository?: ServiceStatusRepository;
+    }) {
         // Set default timeout
         this.axios.defaults.timeout = 180000; // 3 minutes
+        this.messageRepository = deps?.messageRepository ?? new MessageRepository();
+        this.statusRepository = deps?.statusRepository ?? new ServiceStatusRepository();
     }
 
     getServiceType(): ServiceType {
@@ -55,6 +64,9 @@ export class MattermostProvider implements INotificationProvider {
 
             // Test connection by getting user info
             await this.testConnection();
+
+            // Save credentials to database for persistence
+            await this.statusRepository.setMattermostCredentials(config);
 
             this.isConnected = true;
             logger.info('Mattermost provider initialized successfully');
@@ -101,56 +113,84 @@ export class MattermostProvider implements INotificationProvider {
     }
 
     async sendText(recipient: string, message: string, metadata?: Record<string, any>): Promise<SendResult> {
+        // Input validation
+        if (!recipient || typeof recipient !== 'string') {
+            return { success: false, errorMessage: 'Channel ID is required' };
+        }
+
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return { success: false, errorMessage: 'Message content is required' };
+        }
+
+        // Validate channel ID format
+        const channelValidation = validateMattermostChannelId(recipient);
+        if (!channelValidation.isValid) {
+            return { success: false, errorMessage: channelValidation.error || 'Invalid channel ID format' };
+        }
+
+        const sanitizedChannelId = channelValidation.channelId!;
+
         try {
-            // Input validation
-            if (!recipient || typeof recipient !== 'string') {
-                return { success: false, errorMessage: 'Channel ID is required' };
-            }
+            // Create message record in database
+            const msg = await this.messageRepository.create({
+                service: 'mattermost' as ServiceType,
+                recipient: sanitizedChannelId,
+                message: message.trim(),
+                status: 'pending',
+                timestamp: new Date(),
+                metadata: metadata ?? {},
+                requestedBy: (metadata && (metadata as any).requestedBy) || (global as any).__requestedBy || 'admin',
+            } as any);
 
-            if (!message || typeof message !== 'string' || message.trim().length === 0) {
-                return { success: false, errorMessage: 'Message content is required' };
-            }
-
+            // Connection validation
             if (!this.isConnected || !this.config) {
+                await this.messageRepository.markAsFailed(msg.id, 'Mattermost not connected. Please configure and connect first.');
                 return { success: false, errorMessage: 'Mattermost not connected. Please configure and connect first.' };
             }
 
-            // Validate channel ID format
-            const channelValidation = validateMattermostChannelId(recipient);
-            if (!channelValidation.isValid) {
-                return { success: false, errorMessage: channelValidation.error || 'Invalid channel ID format' };
-            }
+            try {
+                logger.info(`Sending Mattermost message to channel: ${sanitizedChannelId}`);
 
-            const sanitizedChannelId = channelValidation.channelId!;
-
-            logger.info(`Sending Mattermost message to channel: ${sanitizedChannelId}`);
-
-            // Prepare the message payload
-            const payload = {
-                channel_id: sanitizedChannelId,
-                message: message.trim(),
-                props: metadata || {}
-            };
-
-            // Send message via REST API
-            const response = await this.axios.post('/posts', payload);
-
-            if (response.status === 201 && response.data) {
-                logger.info(`Mattermost message sent successfully. Post ID: ${response.data.id}`);
-                return {
-                    success: true,
-                    messageId: response.data.id,
-                    metadata: {
-                        channelId: sanitizedChannelId,
-                        postId: response.data.id,
-                        createAt: response.data.create_at
-                    }
+                // Prepare the message payload
+                const payload = {
+                    channel_id: sanitizedChannelId,
+                    message: message.trim(),
+                    props: metadata || {}
                 };
-            } else {
-                return { success: false, errorMessage: 'Unexpected response from Mattermost server' };
+
+                // Send message via REST API
+                const response = await this.axios.post('/posts', payload);
+
+                if (response.status === 201 && response.data) {
+                    const messageId = response.data.id;
+                    await this.messageRepository.markAsSent(msg.id, messageId);
+                    logger.info(`Mattermost message sent successfully. Post ID: ${messageId}`);
+                    
+                    return {
+                        success: true,
+                        messageId: messageId,
+                        metadata: {
+                            channelId: sanitizedChannelId,
+                            postId: messageId,
+                            createAt: response.data.create_at
+                        }
+                    };
+                } else {
+                    await this.messageRepository.markAsFailed(msg.id, 'Unexpected response from Mattermost server');
+                    return { success: false, errorMessage: 'Unexpected response from Mattermost server' };
+                }
+            } catch (sendError) {
+                const errorResult = this.handleMattermostError(sendError, 'send message');
+                await this.messageRepository.markAsFailed(msg.id, errorResult.errorMessage || 'Failed to send message');
+                return errorResult;
             }
         } catch (error) {
-            return this.handleMattermostError(error, 'send message');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+            logger.error('Mattermost send failed (database error):', { 
+                error: errorMessage,
+                recipient: sanitizedChannelId
+            });
+            return { success: false, errorMessage: `Database error: ${errorMessage}` };
         }
     }
 
@@ -213,6 +253,180 @@ export class MattermostProvider implements INotificationProvider {
     }
 
     /**
+     * Get user by email address
+     */
+    async getUserByEmail(email: string): Promise<{ id: string; username: string } | null> {
+        try {
+            if (!this.isConnected || !this.config) {
+                return null;
+            }
+
+            const response = await this.axios.get(`/users/email/${email}`);
+            if (response.status === 200 && response.data) {
+                return {
+                    id: response.data.id,
+                    username: response.data.username
+                };
+            }
+            return null;
+        } catch (error) {
+            logger.error(`Error getting user by email ${email}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Create direct message channel with user
+     */
+    async createDirectMessageChannel(userId: string): Promise<string | null> {
+        try {
+            if (!this.isConnected || !this.config) {
+                return null;
+            }
+
+            // Get current user ID first
+            const meResponse = await this.axios.get('/users/me');
+            if (meResponse.status !== 200) {
+                return null;
+            }
+
+            const currentUserId = meResponse.data.id;
+            
+            // Create direct message channel
+            const response = await this.axios.post('/channels/direct', [
+                currentUserId,
+                userId
+            ]);
+            
+            if (response.status === 201 && response.data) {
+                return response.data.id;
+            }
+            return null;
+        } catch (error) {
+            logger.error(`Error creating DM channel with user ${userId}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Send message by email (convenience method)
+     */
+    async sendTextByEmail(email: string, message: string, metadata?: Record<string, any>): Promise<SendResult> {
+        // Input validation
+        if (!email || typeof email !== 'string') {
+            return { success: false, errorMessage: 'Email address is required' };
+        }
+
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return { success: false, errorMessage: 'Message content is required' };
+        }
+
+        try {
+            // Create message record in database with email as recipient
+            const msg = await this.messageRepository.create({
+                service: 'mattermost' as ServiceType,
+                recipient: email,
+                message: message.trim(),
+                status: 'pending',
+                timestamp: new Date(),
+                metadata: { ...metadata, recipientType: 'email' },
+                requestedBy: (metadata && (metadata as any).requestedBy) || (global as any).__requestedBy || 'admin',
+            } as any);
+
+            // Connection validation
+            if (!this.isConnected || !this.config) {
+                await this.messageRepository.markAsFailed(msg.id, 'Mattermost not connected. Please configure and connect first.');
+                return { success: false, errorMessage: 'Mattermost not connected. Please configure and connect first.' };
+            }
+
+            try {
+                // First, get user by email
+                const user = await this.getUserByEmail(email);
+                if (!user) {
+                    await this.messageRepository.markAsFailed(msg.id, `User with email ${email} not found in Mattermost`);
+                    return { 
+                        success: false, 
+                        errorMessage: `User with email ${email} not found in Mattermost` 
+                    };
+                }
+
+                // Create direct message channel
+                const channelId = await this.createDirectMessageChannel(user.id);
+                if (!channelId) {
+                    await this.messageRepository.markAsFailed(msg.id, `Could not create direct message channel with user ${email}`);
+                    return { 
+                        success: false, 
+                        errorMessage: `Could not create direct message channel with user ${email}` 
+                    };
+                }
+
+                // Update the message record with resolved channel ID
+                await this.messageRepository.updateById(msg.id, { 
+                    metadata: { 
+                        ...metadata, 
+                        recipientType: 'email',
+                        resolvedChannelId: channelId,
+                        targetEmail: email,
+                        targetUsername: user.username 
+                    }
+                });
+
+                logger.info(`Sending Mattermost message by email to: ${email} (resolved to channel: ${channelId})`);
+
+                // Prepare the message payload
+                const payload = {
+                    channel_id: channelId,
+                    message: message.trim(),
+                    props: {
+                        ...metadata,
+                        targetEmail: email,
+                        targetUsername: user.username
+                    }
+                };
+
+                // Send message via REST API
+                const response = await this.axios.post('/posts', payload);
+
+                if (response.status === 201 && response.data) {
+                    const messageId = response.data.id;
+                    await this.messageRepository.markAsSent(msg.id, messageId);
+                    logger.info(`Mattermost message sent successfully to ${email}. Post ID: ${messageId}`);
+                    
+                    return {
+                        success: true,
+                        messageId: messageId,
+                        metadata: {
+                            channelId: channelId,
+                            postId: messageId,
+                            createAt: response.data.create_at,
+                            targetEmail: email,
+                            targetUsername: user.username
+                        }
+                    };
+                } else {
+                    await this.messageRepository.markAsFailed(msg.id, 'Unexpected response from Mattermost server');
+                    return { success: false, errorMessage: 'Unexpected response from Mattermost server' };
+                }
+            } catch (sendError) {
+                const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error sending message by email';
+                await this.messageRepository.markAsFailed(msg.id, errorMessage);
+                logger.error(`Error sending message by email to ${email}:`, sendError);
+                return {
+                    success: false,
+                    errorMessage
+                };
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+            logger.error('Mattermost send by email failed (database error):', { 
+                error: errorMessage,
+                email: email
+            });
+            return { success: false, errorMessage: `Database error: ${errorMessage}` };
+        }
+    }
+
+    /**
      * Get list of channels the bot can access
      */
     async getAvailableChannels(): Promise<MattermostChannelInfo[]> {
@@ -252,6 +466,37 @@ export class MattermostProvider implements INotificationProvider {
             logger.error('Error getting available channels:', error);
             return [];
         }
+    }
+
+    /**
+     * Load existing Mattermost credentials from database
+     */
+    async loadExistingCredentials(): Promise<void> {
+        try {
+            const credentials = await this.statusRepository.getMattermostCredentials();
+            if (credentials) {
+                logger.info('Found existing Mattermost credentials in database');
+                await this.initialize(credentials);
+            } else {
+                logger.info('No existing Mattermost credentials found');
+            }
+        } catch (error) {
+            logger.error('Failed to load existing Mattermost credentials:', error);
+        }
+    }
+
+    /**
+     * Check if Mattermost is configured (has credentials)
+     */
+    isConfigured(): boolean {
+        return this.config !== null;
+    }
+
+    /**
+     * Can auto-connect (has valid configuration)
+     */
+    canAutoConnect(): boolean {
+        return !!(this.config && this.config.serverUrl && this.config.accessToken);
     }
 
     /**
