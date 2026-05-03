@@ -57,6 +57,9 @@ function TabPanel(props: TabPanelProps) {
 
 const ApiDocumentation: React.FC = () => {
     const [tabValue, setTabValue] = useState(0);
+    const [whatsappCodeTab, setWhatsappCodeTab] = useState(0);
+    const [telegramCodeTab, setTelegramCodeTab] = useState(0);
+    const [mattermostCodeTab, setMattermostCodeTab] = useState(0);
     const [testDialogOpen, setTestDialogOpen] = useState(false);
     const [testService, setTestService] = useState<'whatsapp' | 'telegram' | 'mattermost' | 'all'>('all');
     const [testApiKey, setTestApiKey] = useState('');
@@ -184,14 +187,14 @@ const ApiDocumentation: React.FC = () => {
 
     const codeExamples = {
         whatsapp: {
-            curl: `curl -X POST https://your-domain.com/api/notifications/whatsapp \\
+            curl: `curl -X POST https://notification.antic.cm/api/notifications/whatsapp \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ak_your_api_key_here" \\
   -d '{
     "recipient": "+1234567890",
     "message": "Hello from ANTIC Notification Service!"
   }'`,
-            javascript: `const response = await fetch('https://your-domain.com/api/notifications/whatsapp', {
+            javascript: `const response = await fetch('https://notification.antic.cm/api/notifications/whatsapp', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -207,7 +210,7 @@ const result = await response.json();
 console.log(result);`,
             python: `import requests
 
-url = "https://your-domain.com/api/notifications/whatsapp"
+url = "https://notification.antic.cm/api/notifications/whatsapp"
 headers = {
     "Content-Type": "application/json",
     "X-API-Key": "ak_your_api_key_here"
@@ -222,14 +225,14 @@ result = response.json()
 print(result)`
         },
         telegram: {
-            curl: `curl -X POST https://your-domain.com/api/notifications/telegram \\
+            curl: `curl -X POST https://notification.antic.cm/api/notifications/telegram \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ak_your_api_key_here" \\
   -d '{
     "recipient": "+237123456789",
     "message": "Hello from ANTIC Notification Service!"
   }'`,
-            javascript: `const response = await fetch('https://your-domain.com/api/notifications/telegram', {
+            javascript: `const response = await fetch('https://notification.antic.cm/api/notifications/telegram', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -245,7 +248,7 @@ const result = await response.json();
 console.log(result);`,
             python: `import requests
 
-url = "https://your-domain.com/api/notifications/telegram"
+url = "https://notification.antic.cm/api/notifications/telegram"
 headers = {
     "Content-Type": "application/json",
     "X-API-Key": "ak_your_api_key_here"
@@ -260,14 +263,25 @@ result = response.json()
 print(result)`
         },
         mattermost: {
-            curl: `curl -X POST https://your-domain.com/api/notifications/mattermost \\
+            curl: `# Send to channel ID:
+curl -X POST https://notification.antic.cm/api/notifications/mattermost \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ak_your_api_key_here" \\
   -d '{
     "recipient": "4xp9fdt7pbgium38k0k6w95oa4",
     "message": "Hello from ANTIC Notification Service!"
+  }'
+
+# Send to email (direct message):
+curl -X POST https://notification.antic.cm/api/notifications/mattermost \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ak_your_api_key_here" \\
+  -d '{
+    "recipient": "user@example.com",
+    "message": "Hello from ANTIC Notification Service!"
   }'`,
-            javascript: `const response = await fetch('https://your-domain.com/api/notifications/mattermost', {
+            javascript: `// Send to channel ID:
+const response = await fetch('https://notification.antic.cm/api/notifications/mattermost', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -279,23 +293,44 @@ print(result)`
   })
 });
 
+// Send to email (direct message):
+const response2 = await fetch('https://notification.antic.cm/api/notifications/mattermost', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'ak_your_api_key_here'
+  },
+  body: JSON.stringify({
+    recipient: 'user@example.com',
+    message: 'Hello from ANTIC Notification Service!'
+  })
+});
+
 const result = await response.json();
 console.log(result);`,
             python: `import requests
 
-url = "https://your-domain.com/api/notifications/mattermost"
+url = "https://notification.antic.cm/api/notifications/mattermost"
 headers = {
     "Content-Type": "application/json",
     "X-API-Key": "ak_your_api_key_here"
 }
-data = {
+
+# Send to channel ID:
+data_channel = {
     "recipient": "4xp9fdt7pbgium38k0k6w95oa4",
     "message": "Hello from ANTIC Notification Service!"
 }
+response = requests.post(url, headers=headers, json=data_channel)
+print(response.json())
 
-response = requests.post(url, headers=headers, json=data)
-result = response.json()
-print(result)`
+# Send to email (direct message):
+data_email = {
+    "recipient": "user@example.com",
+    "message": "Hello from ANTIC Notification Service!"
+}
+response = requests.post(url, headers=headers, json=data_email)
+print(response.json())`
         }
     };
 
@@ -366,7 +401,7 @@ print(result)`
                                 fontFamily: 'monospace'
                             }}
                         >
-                            https://your-domain.com/api
+                            https://notification.antic.cm/api
                         </Box>
                     </CardContent>
                 </Card>
@@ -463,33 +498,87 @@ print(result)`
                         <Typography fontWeight={600}>Code Examples</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Tabs value={0}>
+                        <Tabs value={whatsappCodeTab} onChange={(_e, v) => setWhatsappCodeTab(v)}>
                             <Tab label="cURL" />
                             <Tab label="JavaScript" />
                             <Tab label="Python" />
                         </Tabs>
                         <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" gutterBottom>cURL</Typography>
-                            <Box
-                                sx={{
-                                    backgroundColor: '#f5f5f5',
-                                    p: 2,
-                                    borderRadius: 1,
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.875rem',
-                                    whiteSpace: 'pre-wrap',
-                                    position: 'relative'
-                                }}
-                            >
-                                {codeExamples.whatsapp.curl}
-                                <Button
-                                    size="small"
-                                    onClick={() => copyToClipboard(codeExamples.whatsapp.curl)}
-                                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                                >
-                                    <CopyIcon fontSize="small" />
-                                </Button>
-                            </Box>
+                            {whatsappCodeTab === 0 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>cURL</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.whatsapp.curl}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.whatsapp.curl)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {whatsappCodeTab === 1 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>JavaScript</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.whatsapp.javascript}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.whatsapp.javascript)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {whatsappCodeTab === 2 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>Python</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.whatsapp.python}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.whatsapp.python)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     </AccordionDetails>
                 </Accordion>
@@ -570,33 +659,87 @@ print(result)`
                         <Typography fontWeight={600}>Code Examples</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Tabs value={0}>
+                        <Tabs value={telegramCodeTab} onChange={(_e, v) => setTelegramCodeTab(v)}>
                             <Tab label="cURL" />
                             <Tab label="JavaScript" />
                             <Tab label="Python" />
                         </Tabs>
                         <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" gutterBottom>cURL</Typography>
-                            <Box
-                                sx={{
-                                    backgroundColor: '#f5f5f5',
-                                    p: 2,
-                                    borderRadius: 1,
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.875rem',
-                                    whiteSpace: 'pre-wrap',
-                                    position: 'relative'
-                                }}
-                            >
-                                {codeExamples.telegram.curl}
-                                <Button
-                                    size="small"
-                                    onClick={() => copyToClipboard(codeExamples.telegram.curl)}
-                                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                                >
-                                    <CopyIcon fontSize="small" />
-                                </Button>
-                            </Box>
+                            {telegramCodeTab === 0 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>cURL</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.telegram.curl}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.telegram.curl)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {telegramCodeTab === 1 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>JavaScript</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.telegram.javascript}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.telegram.javascript)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {telegramCodeTab === 2 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>Python</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.telegram.python}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.telegram.python)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     </AccordionDetails>
                 </Accordion>
@@ -640,7 +783,7 @@ print(result)`
                                         <TableCell>recipient</TableCell>
                                         <TableCell>string</TableCell>
                                         <TableCell>Yes</TableCell>
-                                        <TableCell>Mattermost channel ID (26 alphanumeric characters)</TableCell>
+                                        <TableCell>Mattermost channel ID (26 alphanumeric characters) OR email address for direct messages</TableCell>
                                     </TableRow>
                                     <TableRow>
                                         <TableCell>message</TableCell>
@@ -676,33 +819,87 @@ print(result)`
                         <Typography fontWeight={600}>Code Examples</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Tabs value={0}>
+                        <Tabs value={mattermostCodeTab} onChange={(_e, v) => setMattermostCodeTab(v)}>
                             <Tab label="cURL" />
                             <Tab label="JavaScript" />
                             <Tab label="Python" />
                         </Tabs>
                         <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" gutterBottom>cURL</Typography>
-                            <Box
-                                sx={{
-                                    backgroundColor: '#f5f5f5',
-                                    p: 2,
-                                    borderRadius: 1,
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.875rem',
-                                    whiteSpace: 'pre-wrap',
-                                    position: 'relative'
-                                }}
-                            >
-                                {codeExamples.mattermost.curl}
-                                <Button
-                                    size="small"
-                                    onClick={() => copyToClipboard(codeExamples.mattermost.curl)}
-                                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                                >
-                                    <CopyIcon fontSize="small" />
-                                </Button>
-                            </Box>
+                            {mattermostCodeTab === 0 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>cURL</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.mattermost.curl}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.mattermost.curl)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {mattermostCodeTab === 1 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>JavaScript</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.mattermost.javascript}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.mattermost.javascript)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                            {mattermostCodeTab === 2 && (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom>Python</Typography>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: '#f5f5f5',
+                                            p: 2,
+                                            borderRadius: 1,
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.875rem',
+                                            whiteSpace: 'pre-wrap',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {codeExamples.mattermost.python}
+                                        <Button
+                                            size="small"
+                                            onClick={() => copyToClipboard(codeExamples.mattermost.python)}
+                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                        >
+                                            <CopyIcon fontSize="small" />
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     </AccordionDetails>
                 </Accordion>

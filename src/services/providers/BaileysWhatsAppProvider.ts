@@ -7,6 +7,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import QRCode from 'qrcode';
 import P from 'pino';
+import fs from 'fs';
 import { ServiceStatusRepository } from '@/database/repositories/ServiceStatusRepository';
 import { MessageRepository } from '@/database/repositories/MessageRepository';
 import { ServiceType } from '@/types';
@@ -58,11 +59,39 @@ export class BaileysWhatsAppProvider {
         }
 
         try {
+            // Check if WhatsApp is marked as disconnected in database
+            const status = await this.statusRepository.findByService('whatsapp');
+
+            // Only delete session files if there are existing credentials but we're disconnected
+            // This prevents deleting fresh credentials after QR scan during restart
+            const hasExistingSession = fs.existsSync(config.whatsapp.sessionPath) &&
+                                      fs.readdirSync(config.whatsapp.sessionPath).length > 0;
+
+            if (status && status.status === 'disconnected' && hasExistingSession) {
+                // Check if session files have credentials (creds.json exists)
+                const credsPath = `${config.whatsapp.sessionPath}/creds.json`;
+                const hasCredentials = fs.existsSync(credsPath);
+
+                // Only clear if NOT recently modified (older than 30 seconds)
+                // This prevents deleting fresh credentials from QR scan
+                if (hasCredentials) {
+                    const stats = fs.statSync(credsPath);
+                    const ageMs = Date.now() - stats.mtimeMs;
+
+                    if (ageMs > 30000) { // Older than 30 seconds
+                        logger.info('WhatsApp is disconnected with old session, clearing session files');
+                        fs.rmSync(config.whatsapp.sessionPath, { recursive: true, force: true });
+                        logger.info('Deleted old session files for fresh start');
+                    } else {
+                        logger.info('Session files are fresh (likely from recent QR scan), preserving them');
+                    }
+                }
+            }
+
             logger.info('Creating new Baileys WhatsApp client instance');
             logger.info('Session path:', config.whatsapp.sessionPath);
 
             // Ensure session directory exists before creating auth state
-            const fs = require('fs');
             if (!fs.existsSync(config.whatsapp.sessionPath)) {
                 fs.mkdirSync(config.whatsapp.sessionPath, { recursive: true });
                 logger.info('Created session directory:', config.whatsapp.sessionPath);
@@ -74,26 +103,22 @@ export class BaileysWhatsAppProvider {
 
             logger.info('Auth state loaded, creds available:', !!state.creds);
 
-            // Create the socket with improved configuration
+            // Define WhatsApp version to prevent protocol mismatch (fixes 405 error)
+            const WHATSAPP_VERSION: [number, number, number] = [2, 3000, 1027934701];
+
+            // Create the socket with extended timeouts for slow connections
+            // Increased from 60s to 180s to accommodate slow internet (1.63 Mbps)
             this.socket = makeWASocket({
                 auth: state,
+                version: WHATSAPP_VERSION,
+                browser: ['Ubuntu', 'Chrome', '22.04.4'],
                 printQRInTerminal: false,
-                connectTimeoutMs: 90000, // Increased for QR scanning
-                defaultQueryTimeoutMs: 90000,
-                qrTimeout: 60000, // Increased QR timeout
-                logger: P({ level: 'silent' }),
-                retryRequestDelayMs: 2000, // Faster retries during auth
-                maxMsgRetryCount: 3, // More retries for auth process
-                getMessage: async () => undefined,
-                syncFullHistory: false,
-                markOnlineOnConnect: false,
-                browser: ['Antic Notification', 'Chrome', '1.0.0'],
-                mobile: false,
-                emitOwnEvents: true,
-                fireInitQueries: true,
-                generateHighQualityLinkPreview: false,
-                shouldIgnoreJid: () => false,
-                keepAliveIntervalMs: 30000,
+                connectTimeoutMs: 180000, // 3 minutes (was 60s)
+                defaultQueryTimeoutMs: 180000, // 3 minutes (was 60s)
+                keepAliveIntervalMs: 30000, // Send keepalive every 30s
+                retryRequestDelayMs: 5000, // 5s delay between retries (was default 2s)
+                qrTimeout: 120000, // 2 minutes for QR code generation
+                markOnlineOnConnect: false, // Reduce initial connection overhead
             });
 
             // Set up basic event handlers for QR and connection status
@@ -162,7 +187,9 @@ export class BaileysWhatsAppProvider {
                 await this.statusRepository.markAsDisconnected('whatsapp');
 
                 const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                // Don't reconnect for logged out, forbidden, or method not allowed errors
+                const permanentErrors = [DisconnectReason.loggedOut, 403, 405];
+                const shouldReconnect = !permanentErrors.includes(statusCode || 0);
 
                 logger.info(`WhatsApp connection closed due to ${this.getDisconnectReasonName(statusCode)}, reconnecting: ${shouldReconnect}`);
 
@@ -172,10 +199,11 @@ export class BaileysWhatsAppProvider {
                     if (statusCode === DisconnectReason.restartRequired) {
                         logger.info('Restart required - likely after QR scan, reconnecting immediately');
                         // Reconnect immediately for restart required errors during auth
+                        // DO NOT delete session files - they contain the authenticated credentials
                         setTimeout(() => {
                             if (!this.connected) {
                                 logger.info('Attempting immediate reconnection after restart required');
-                                this.reconnect().catch(err =>
+                                this.softReconnect().catch(err =>
                                     logger.error('Auto-reconnect failed:', err)
                                 );
                             }
@@ -269,11 +297,31 @@ export class BaileysWhatsAppProvider {
             this.stopPolling();
 
             if (this.socket) {
-                // Baileys logout
-                await this.socket.logout();
-                this.socket.end(undefined);
+                try {
+                    // Only logout if connection is active (prevents 428 error on already closed connections)
+                    if (this.connected) {
+                        await this.socket.logout();
+                        logger.info('Baileys WhatsApp logout completed successfully');
+                    } else {
+                        logger.info('Socket already closed, skipping logout');
+                    }
+                } catch (logoutError) {
+                    // Ignore logout errors for already closed connections
+                    const error = logoutError as Boom;
+                    if (error?.output?.statusCode === 428) {
+                        logger.info('Socket already closed, logout not needed');
+                    } else {
+                        logger.warn('Logout error (continuing with cleanup):', logoutError);
+                    }
+                }
+
+                // Always end the socket and clean up
+                try {
+                    this.socket.end(undefined);
+                } catch (endError) {
+                    logger.warn('Error ending socket (continuing with cleanup):', endError);
+                }
                 this.socket = null;
-                logger.info('Baileys WhatsApp logout completed successfully');
             }
 
             // Reset all state
@@ -352,9 +400,9 @@ export class BaileysWhatsAppProvider {
                     text: message.trim()
                 });
 
-                // Add timeout to prevent hanging
+                // Add timeout to prevent hanging (increased for slow connection)
                 const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Message send timeout after 30 seconds')), 30000)
+                    setTimeout(() => reject(new Error('Message send timeout after 90 seconds')), 90000)
                 );
 
                 const sentMessage = await Promise.race([sendPromise, timeoutPromise]);
@@ -466,6 +514,29 @@ export class BaileysWhatsAppProvider {
         await this.init();
     }
 
+    public async softReconnect(): Promise<void> {
+        logger.info('Soft reconnecting Baileys WhatsApp client (preserving session)');
+
+        // Stop polling
+        this.stopPolling();
+
+        // Clean up socket without logout (preserve credentials)
+        if (this.socket) {
+            try {
+                this.socket.end(undefined);
+            } catch (error) {
+                logger.warn('Error ending socket during soft reconnect:', error);
+            }
+            this.socket = null;
+        }
+
+        // Reset connection state but keep initialized flag
+        this.connected = false;
+
+        // Reinitialize with existing session files
+        await this.init();
+    }
+
     public async forceReset(): Promise<void> {
         logger.info('Force resetting Baileys WhatsApp client state');
         await this.disconnect();
@@ -487,7 +558,6 @@ export class BaileysWhatsAppProvider {
 
         // Delete existing session files to force new QR generation
         try {
-            const fs = require('fs');
             const sessionPath = config.whatsapp.sessionPath;
             if (fs.existsSync(sessionPath)) {
                 fs.rmSync(sessionPath, { recursive: true, force: true });
@@ -586,6 +656,7 @@ export class BaileysWhatsAppProvider {
         const reasons: Record<number, string> = {
             401: 'Logged Out',
             403: 'Forbidden',
+            405: 'Method Not Allowed (WhatsApp Protocol Changed)',
             408: 'Timed Out / Connection Lost',
             411: 'Multidevice Mismatch',
             428: 'Connection Closed',
@@ -599,23 +670,24 @@ export class BaileysWhatsAppProvider {
     }
 
     private getReconnectDelay(statusCode?: number): number {
-        if (!statusCode) return 30000; // 30 seconds default
+        if (!statusCode) return 60000; // 60 seconds default (was 30s)
 
         // Implement exponential backoff based on error type
+        // All delays doubled to accommodate slow internet connection
         switch (statusCode) {
             case DisconnectReason.restartRequired: // 515 - restart required, wait longer
                 return 300000; // 5 minutes
             case DisconnectReason.connectionLost:
             case DisconnectReason.connectionClosed:
-                return 10000; // 10 seconds
-            case DisconnectReason.timedOut:
-                return 30000; // 30 seconds
+                return 20000; // 20 seconds (was 10s)
+            case DisconnectReason.timedOut: // 408 - most common on slow connections
+                return 60000; // 60 seconds (was 30s) - give more time before retry
             case DisconnectReason.badSession:
-                return 60000; // 1 minute
+                return 120000; // 2 minutes (was 1 minute)
             case DisconnectReason.unavailableService:
-                return 120000; // 2 minutes
+                return 180000; // 3 minutes (was 2 minutes)
             default:
-                return 30000; // 30 seconds default
+                return 60000; // 60 seconds default (was 30s)
         }
     }
 

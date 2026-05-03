@@ -4,14 +4,34 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [
+        react(),
+        {
+            name: 'spa-fallback',
+            configureServer(server) {
+                server.middlewares.use((req, res, next) => {
+                    // If the request is not for an API route, file, or asset, serve index.html
+                    if (
+                        req.url &&
+                        !req.url.startsWith('/api') &&
+                        !req.url.startsWith('/@') &&
+                        !req.url.includes('.') &&
+                        req.url !== '/'
+                    ) {
+                        req.url = '/';
+                    }
+                    next();
+                });
+            },
+        },
+    ],
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
         },
     },
     server: {
-        port: 3001,
+        port: 5173,
         proxy: {
             '/api': {
                 target: 'http://localhost:3000',
@@ -21,5 +41,8 @@ export default defineConfig({
     },
     define: {
         'process.env': {},
+    },
+    preview: {
+        port: 3001,
     },
 })

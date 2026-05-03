@@ -1,5 +1,5 @@
 import { TelegramClient, Api } from 'telegram';
-import { StringSession } from 'telegram/sessions';
+import { StringSession } from 'telegram/sessions/index.js';
 import bigInt from 'big-integer';
 import { MessageRepository } from '@/database/repositories/MessageRepository';
 import { ServiceStatusRepository } from '@/database/repositories/ServiceStatusRepository';
@@ -237,6 +237,39 @@ export class GramJSTelegramProvider extends (EventEmitter as { new(): EventEmitt
             this.connected = false;
             this.reconnectAttempts = 0;
             this.emit('disconnected');
+        }
+    }
+
+    // Clear invalid session to prevent continuous OTP requests on startup
+    public async clearInvalidSession(): Promise<void> {
+        try {
+            logger.info('Clearing invalid Telegram session');
+
+            // Disconnect client if connected
+            if (this.client) {
+                try {
+                    await this.client.disconnect();
+                } catch (err) {
+                    // Ignore disconnect errors
+                }
+                this.client = null;
+            }
+
+            // Clear the session string from credentials
+            if (this.credentials) {
+                this.credentials.sessionString = '';
+                await this.statusRepository.setTelegramCredentials(this.credentials);
+                logger.info('Cleared Telegram session string from database');
+            }
+
+            this.connected = false;
+            this.authInProgress = false;
+            this.reconnectAttempts = 0;
+            await this.statusRepository.markAsDisconnected('telegram');
+
+            logger.info('Telegram session cleared successfully');
+        } catch (error) {
+            logger.error('Error clearing Telegram session:', error);
         }
     }
 

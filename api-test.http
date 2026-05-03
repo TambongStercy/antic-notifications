@@ -1,0 +1,341 @@
+###
+# ANTIC Notification Service - API Testing
+# REST Client file for VS Code REST Client extension
+# Base URL: https://notification.antic.cm
+###
+
+###
+# WORKING! The API is now accessible at https://notification.antic.cm
+###
+
+@baseUrl = https://notification.antic.cm
+@apiKey = ak_4b2eee5433ba901033f5a741ca48c452
+
+### ============================================
+### HEALTH CHECK
+### ============================================
+
+### Health Check - No auth required
+GET {{baseUrl}}/api/health
+Content-Type: application/json
+
+
+### ============================================
+### WHATSAPP NOTIFICATIONS
+### ============================================
+
+### Send WhatsApp Message
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237675080477",
+  "message": "ANTIC vous dis Bonsoir"
+}
+
+### Send WhatsApp Message with Media (Image)
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237675080477",
+  "message": "Check out this image!",
+  "mediaUrl": "https://example.com/image.jpg"
+}
+
+### Send WhatsApp Message to Multiple Recipients
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789,+237987654321",
+  "message": "Bulk message to multiple recipients"
+}
+
+
+### ============================================
+### TELEGRAM NOTIFICATIONS
+### ============================================
+
+### Send Telegram Message
+POST {{baseUrl}}/api/notifications/telegram
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237691172662",
+  "message": "ANTIC vous dis Bonsoir via Telegram!"
+}
+
+### Send Telegram Message with Username
+POST {{baseUrl}}/api/notifications/telegram
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "@username",
+  "message": "Direct message to Telegram username"
+}
+
+### Send Telegram Message with Chat ID
+POST {{baseUrl}}/api/notifications/telegram
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "123456789",
+  "message": "Message using Telegram chat ID"
+}
+
+
+### ============================================
+### MATTERMOST NOTIFICATIONS (if configured)
+### ============================================
+
+### Send Mattermost Message
+POST {{baseUrl}}/api/notifications/mattermost
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "@username",
+  "message": "Hello from ANTIC Notification Service via Mattermost!"
+}
+
+
+### ============================================
+### MESSAGE STATUS & HISTORY
+### ============================================
+
+### Get All Messages
+GET {{baseUrl}}/api/messages
+X-API-Key: {{apiKey}}
+
+### Get Messages with Filters (WhatsApp only)
+GET {{baseUrl}}/api/messages?service=whatsapp
+X-API-Key: {{apiKey}}
+
+### Get Messages with Filters (Telegram only)
+GET {{baseUrl}}/api/messages?service=telegram
+X-API-Key: {{apiKey}}
+
+### Get Messages with Status Filter (sent only)
+GET {{baseUrl}}/api/messages?status=sent
+X-API-Key: {{apiKey}}
+
+### Get Messages with Status Filter (failed only)
+GET {{baseUrl}}/api/messages?status=failed
+X-API-Key: {{apiKey}}
+
+### Get Messages with Combined Filters
+GET {{baseUrl}}/api/messages?service=whatsapp&status=sent&limit=10
+X-API-Key: {{apiKey}}
+
+### Get Specific Message by ID
+# Replace {messageId} with actual message ID
+GET {{baseUrl}}/api/messages/68f49e5e75cd6ebc9a9b8833
+X-API-Key: {{apiKey}}
+
+
+### ============================================
+### SERVICE STATUS
+### ============================================
+
+### Get Service Status (All services)
+GET {{baseUrl}}/api/status
+X-API-Key: {{apiKey}}
+
+### Get WhatsApp Service Status
+GET {{baseUrl}}/api/status/whatsapp
+X-API-Key: {{apiKey}}
+
+### Get Telegram Service Status
+GET {{baseUrl}}/api/status/telegram
+X-API-Key: {{apiKey}}
+
+
+### ============================================
+### ADMIN ENDPOINTS (Requires JWT Token)
+### ============================================
+
+### Admin Login
+# @name adminLogin
+POST {{baseUrl}}/api/admin/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+### Extract token from login response
+@authToken = {{adminLogin.response.body.$.token}}
+
+### Get Admin Status (requires admin token)
+GET {{baseUrl}}/api/admin/status
+Authorization: Bearer {{authToken}}
+
+### Get All API Keys (requires admin token)
+GET {{baseUrl}}/api/admin/api-keys
+Authorization: Bearer {{authToken}}
+
+### Create New API Key (requires admin token)
+POST {{baseUrl}}/api/admin/api-keys
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "New Test API Key",
+  "permissions": ["whatsapp:send", "telegram:send"],
+  "rateLimit": {
+    "requests": 100,
+    "windowMs": 3600000
+  }
+}
+
+### Deactivate API Key (requires admin token)
+# Replace {keyId} with actual API key ID
+DELETE {{baseUrl}}/api/admin/api-keys/68f49e5e75cd6ebc9a9b8833
+Authorization: Bearer {{authToken}}
+
+### Connect WhatsApp (requires admin token)
+POST {{baseUrl}}/api/admin/whatsapp/connect
+Authorization: Bearer {{authToken}}
+
+### Disconnect WhatsApp (requires admin token)
+POST {{baseUrl}}/api/admin/whatsapp/disconnect
+Authorization: Bearer {{authToken}}
+
+### Get WhatsApp QR Code (requires admin token)
+GET {{baseUrl}}/api/admin/whatsapp/qr
+Authorization: Bearer {{authToken}}
+
+### Set Telegram Bot Token (requires admin token)
+POST {{baseUrl}}/api/admin/telegram/config
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "botToken": "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+}
+
+### Connect Telegram (requires admin token)
+POST {{baseUrl}}/api/admin/telegram/connect
+Authorization: Bearer {{authToken}}
+
+### Disconnect Telegram (requires admin token)
+POST {{baseUrl}}/api/admin/telegram/disconnect
+Authorization: Bearer {{authToken}}
+
+
+### ============================================
+### TESTING SCENARIOS
+### ============================================
+
+### Test 1: Send WhatsApp and check status
+# @name whatsappTest
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789",
+  "message": "Test message - scenario 1"
+}
+
+### Get the message ID from previous request
+@messageId = {{whatsappTest.response.body.$.messageId}}
+
+### Check message status
+GET {{baseUrl}}/api/messages/{{messageId}}
+X-API-Key: {{apiKey}}
+
+
+### Test 2: Send to invalid number (should fail)
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "invalid-number",
+  "message": "This should fail validation"
+}
+
+
+### Test 3: Send without API key (should return 401)
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+
+{
+  "recipient": "+237123456789",
+  "message": "This should fail - no API key"
+}
+
+
+### Test 4: Send with invalid API key (should return 401)
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: invalid_api_key_123
+
+{
+  "recipient": "+237123456789",
+  "message": "This should fail - invalid API key"
+}
+
+
+### Test 5: Rate limit test (send multiple requests quickly)
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789",
+  "message": "Rate limit test 1"
+}
+
+###
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789",
+  "message": "Rate limit test 2"
+}
+
+###
+POST {{baseUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789",
+  "message": "Rate limit test 3"
+}
+
+
+### ============================================
+### LOCAL DEVELOPMENT (localhost)
+### ============================================
+
+@localUrl = http://localhost:3000
+
+### Health Check - Local
+GET {{localUrl}}/api/health
+
+### Send WhatsApp - Local
+POST {{localUrl}}/api/notifications/whatsapp
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "recipient": "+237123456789",
+  "message": "Test message from local development"
+}
+
+### Get Messages - Local
+GET {{localUrl}}/api/messages
+X-API-Key: {{apiKey}}

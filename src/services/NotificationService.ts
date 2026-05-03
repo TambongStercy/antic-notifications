@@ -44,12 +44,31 @@ export class NotificationService {
         await this.whatsapp.init();
 
         // Auto-connect telegram if a session string exists (no user interaction required)
+        // Only attempt auto-connect if we have a valid session that doesn't require OTP
         if (this.telegram.isConfigured() && (this.telegram as any).canAutoConnect && (this.telegram as any).canAutoConnect()) {
+            logger.info('Telegram session detected, attempting auto-connect (this should NOT require OTP)...');
             try {
-                await this.telegram.connect();
-                logger.info('Telegram auto-connected using stored session');
+                // Check if already connected (to avoid reconnecting)
+                if (this.telegram.isConnected()) {
+                    logger.info('Telegram already connected');
+                } else {
+                    // Use timeout to prevent hanging on failed connections
+                    await Promise.race([
+                        this.telegram.connect(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Telegram connection timeout')), 15000))
+                    ]);
+                    logger.info('Telegram auto-connected using stored session');
+                }
             } catch (err) {
-                logger.warn('Telegram auto-connect failed; manual connect required');
+                const error = err as Error;
+                logger.warn('Telegram auto-connect failed; manual connect required', error.message);
+
+                // Mark as disconnected in database since auto-connect failed
+                await this.statusRepository.markAsDisconnected('telegram');
+
+                // Clear the invalid session to prevent continuous OTP requests
+                logger.info('Clearing invalid Telegram session to prevent repeated OTP requests');
+                await this.telegram.clearInvalidSession();
             }
         } else if (this.telegram.isConfigured()) {
             logger.info('Telegram credentials configured, ready for manual connection');

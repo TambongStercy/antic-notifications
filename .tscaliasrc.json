@@ -1,0 +1,8 @@
+{
+  "resolveFullPaths": true,
+  "replacers": {
+    "exampleReplacer": {
+      "enabled": false
+    }
+  }
+}

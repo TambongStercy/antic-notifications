@@ -1,13 +1,14 @@
 {
   "name": "antic-notification-service",
   "version": "1.0.0",
+  "type": "module",
   "description": "A notification service for sending WhatsApp and Telegram messages via API",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build": "rimraf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/add-js-extensions.js",
     "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules -r tsconfig-paths/register src/index.ts",
-    "start:dev": "cross-env NODE_ENV=development ts-node --transpile-only -r tsconfig-paths/register src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "start:dev": "cross-env NODE_ENV=development tsx src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -18,7 +19,8 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f notification-service",
     "init-db": "cross-env ts-node --transpile-only -r tsconfig-paths/register scripts/init-db.ts",
-    "init-db:samples": "cross-env ts-node --transpile-only -r tsconfig-paths/register scripts/init-db.ts --samples"
+    "init-db:samples": "cross-env ts-node --transpile-only -r tsconfig-paths/register scripts/init-db.ts --samples",
+    "add-apikey": "tsx scripts/add-apikey.ts"
   },
   "keywords": [
     "notification",
@@ -32,7 +34,7 @@
   "license": "MIT",
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.18",
+    "@whiskeysockets/baileys": "^6.7.20",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "cross-env": "^10.0.0",
@@ -59,7 +61,7 @@
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^22.17.0",
+    "@types/node": "^22.18.10",
     "@types/node-telegram-bot-api": "^0.64.10",
     "@types/qrcode": "^1.5.5",
     "@types/supertest": "^6.0.3",
@@ -71,6 +73,7 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.2.5",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.7.3"
   },
   "engines": {

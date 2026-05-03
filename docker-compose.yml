@@ -1,12 +1,31 @@
 services:
+  # Nginx Reverse Proxy with SSL
+  nginx:
+    image: nginx:alpine
+    container_name: antic-nginx-proxy
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./tls/antic.cm/antic.crt:/etc/nginx/ssl/antic.crt:ro
+      - ./tls/antic.cm/antic.key:/etc/nginx/ssl/antic.key:ro
+      - ./tls/certs/intermediate.crt:/etc/nginx/ssl/intermediate.crt:ro
+    depends_on:
+      notification-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - notification-network
+
   # Frontend React Application
   admin-dashboard:
     build:
       context: ./admin-dashboard
       dockerfile: Dockerfile
     container_name: antic-admin-dashboard
-    ports:
-      - "8080:80"
+    expose:
+      - "80"
     environment:
       NODE_ENV: production
     depends_on:
@@ -20,16 +39,15 @@ services:
   notification-service:
     build: .
     container_name: antic-notification-service
-    ports:
-      - "8000:3000"
-      - "8002:3002"
-    extra_hosts:
-      - "teamwork.antic.cm:10.10.40.237"  # Force domain to local IP
+    expose:
+      - "3000"
+      - "3002"
+    # Remove extra_hosts to allow normal DNS resolution for teamwork.antic.cm
     environment:
       NODE_ENV: production
       PORT: 3000
       WEBSOCKET_PORT: 3002
-      MONGODB_URI: ${MONGODB_URI:-mongodb://host.docker.internal:27017/notification-service}
+      MONGODB_URI: mongodb://host.docker.internal:27017/notification-service
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}

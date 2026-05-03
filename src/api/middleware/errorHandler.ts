@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { ValidationError } from 'joi';
+import Joi from 'joi';
 import logger from '@/utils/logger';
+
+// Note: Joi's ValidationError is accessed via Joi.ValidationError, not destructured
+const ValidationError = Joi.ValidationError;
 
 export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
     let status = err.status || 500;

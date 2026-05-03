@@ -6,7 +6,9 @@ RUN apk update && apk add --no-cache \
     # Build dependencies (needed for npm install)
     python3 make g++ cairo-dev pango-dev \
     # Runtime dependencies for WhatsApp/Puppeteer
-    chromium nss freetype ca-certificates cairo pango
+    chromium nss freetype ca-certificates cairo pango \
+    # Health check dependency
+    curl
 
 # Build stage - inherits cached system dependencies
 FROM base AS builder
@@ -20,8 +22,9 @@ COPY tsconfig*.json ./
 # Install ALL dependencies (dev + prod) for build
 RUN npm ci
 
-# Copy source code
+# Copy source code and scripts
 COPY src ./src
+COPY scripts ./scripts
 
 # Build the application
 RUN npm run build
@@ -32,11 +35,15 @@ FROM base AS production
 # System dependencies already installed in base layer - no additional downloads needed!
 
 # Build arguments for configurable environment variables (after heavy operations)
-ARG MONGODB_URI=mongodb://172.17.0.1:27017/notification-service
+ARG MONGODB_URI=mongodb://host.docker.internal:27017/notification-service
 ARG NODE_ENV=production
 
 # Create app directory
 WORKDIR /app
+
+# Copy entrypoint script BEFORE creating user (needs root to copy to /usr/local/bin)
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -70,6 +77,9 @@ EXPOSE 3000 3001 3002
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Start the application
 CMD ["node", "dist/index.js"]

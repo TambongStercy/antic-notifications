@@ -9,6 +9,8 @@
         "noImplicitAny": false,
         "noPropertyAccessFromIndexSignature": false,
         "noUncheckedIndexedAccess": false,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "outDir": "./dist",
+        "baseUrl": "./src"
     }
 }
